@@ -1,0 +1,381 @@
+/* ===============================
+   RESET
+=============================== */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f6f8;
+    color: #333;
+    display: flex;
+    min-height: 100vh;
+}
+
+/* ===============================
+   SIDEBAR
+=============================== */
+.sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 230px;
+    height: 100vh;
+    background: #1e293b;
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    padding: 20px 0;
+}
+
+.sidebar-header {
+    text-align: center;
+    font-weight: bold;
+    font-size: 20px;
+    margin-bottom: 30px;
+}
+
+.sidebar-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding: 0 20px;
+}
+
+/* 🔹 Aquí mejoramos los enlaces del menú */
+.sidebar-nav a {
+    color: #cbd5e1;
+    text-decoration: none;
+    padding: 8px;
+    border-radius: 6px;
+    transition: background 0.3s;
+    
+    display: flex;              /* icono + texto alineados */
+    align-items: center;
+    gap: 8px;                   /* separación icono / texto */
+    font-size: 14px;
+}
+
+/* 🔹 Tamaño de los SVG */
+.sidebar-nav a svg {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+}
+
+/* Hover */
+.sidebar-nav a:hover {
+    background: #334155;
+}
+
+.sidebar-btn {
+    margin: auto 20px 20px;
+    padding: 10px;
+    background: #3b82f6;
+    border: none;
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    transition: background 0.3s;
+}
+
+.sidebar-btn:hover {
+    background: #2563eb;
+}
+/* ===============================
+   MAIN CONTENT
+=============================== */
+.main-content {
+    margin-left: 230px; /* espacio para la sidebar */
+    padding: 30px;
+    width: 100%;
+    min-height: 100vh;
+    background-color: #f8f9fa;
+    box-sizing: border-box;
+}
+
+.content {
+    max-width: 1000px;
+    width: 90%;
+    margin: 20px auto;
+    background: #fff;
+    padding: 30px 25px;
+    border-radius: 8px;
+    box-shadow: 0px 4px 12px rgba(0,0,0,0.1);
+}
+
+/* ===============================
+   TOPBAR
+=============================== */
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 20px;
+    background: #5563DE;
+    color: #fff;
+}
+
+.topbar-title {
+    font-size: 20px;
+    font-weight: bold;
+}
+
+.topbar-user {
+    color: #fff;
+}
+
+.topbar-user-dropdown {
+    position: relative;
+}
+
+.user-btn {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 5px;
+}
+
+.user-btn:hover {
+    background: rgba(255,255,255,0.2);
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    right: 0;
+    background: #fff;
+    color: #333;
+    min-width: 150px;
+    box-shadow: 0 5px 10px rgba(0,0,0,0.2);
+    border-radius: 8px;
+    overflow: hidden;
+    z-index: 1000;
+}
+
+.dropdown-content a {
+    display: block;
+    padding: 10px;
+    text-decoration: none;
+    color: #333;
+    transition: background 0.3s;
+}
+
+.dropdown-content a:hover {
+    background: #f2f2f2;
+}
+
+/* Mostrar dropdown al hacer click */
+.topbar-user-dropdown.active .dropdown-content {
+    display: block;
+}
+
+/* ===============================
+   FORM ELEMENTS
+=============================== */
+input[type="text"],
+input[type="date"],
+textarea,
+select {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+button {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+button.btn-success {
+    background-color: #28a745;
+    color: white;
+}
+
+button.btn-success:hover {
+    background-color: #218838;
+}
+
+button.btn-primary {
+    background-color: #007bff;
+    color: white;
+}
+
+button.btn-primary:hover {
+    background-color: #0069d9;
+}
+
+form#telegramForm {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.form-group {
+    margin-bottom: 15px;
+}
+
+.form-group label {
+    display: block;
+    font-weight: bold;
+    margin-bottom: 5px;
+}
+
+form button {
+    margin-top: 8px;
+}
+
+/* ===============================
+   HEADINGS & HR
+=============================== */
+.content h1, .content h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+}
+
+.content hr {
+    margin: 25px 0;
+}
+
+/* ===============================
+   LISTS DE EVENTOS
+=============================== */
+.content ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.content ul li {
+    background: #f1f5f9;
+    padding: 12px 15px;
+    margin-bottom: 10px;
+    border-radius: 6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+/* ===============================
+   RESPONSIVE
+=============================== */
+@media (max-width: 1024px) {
+    .main-content {
+        margin-left: 200px;
+        padding: 20px;
+    }
+    .content {
+        width: 95%;
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        flex-direction: column;
+    }
+
+    .sidebar {
+        position: relative;
+        width: 100%;
+        height: auto;
+        padding: 15px 0;
+    }
+
+    .main-content {
+        margin-left: 0;
+        padding: 15px;
+    }
+
+    .content {
+        width: 100%;
+        padding: 20px;
+    }
+
+    .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+}
+/* Layout base para que el footer funcione */
+.main-content {
+    margin-left: 230px;
+    width: 100%;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+/* El contenido crece */
+.content {
+    flex: 1;
+}
+
+/* ===============================
+   FOOTER PRO
+=============================== */
+.footer {
+  background: #0f172a;
+  color: #cbd5e1;
+  padding: 12px 20px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  font-size: 14px;
+  margin-top: auto; /* 🔥 CLAVE */
+}
+
+.footer-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.footer-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.footer-copy {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.footer-links {
+  display: flex;
+  gap: 15px;
+}
+
+.footer-links a {
+  color: #38bdf8;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.footer-links a:hover {
+  color: #0ea5e9;
+  text-decoration: underline;
+}
+
+.footer-right {
+  font-size: 12px;
+}
+
+.footer-status {
+  background: rgba(34,197,94,0.1);
+  color: #22c55e;
+  padding: 4px 8px;
+  border-radius: 20px;
+  font-size: 12px;
+}

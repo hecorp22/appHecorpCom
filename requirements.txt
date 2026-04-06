@@ -1,0 +1,41 @@
+# --- Core FastAPI y servidor ---
+fastapi==0.117.1
+uvicorn[standard]==0.36.0
+starlette==0.48.0
+jinja2==3.1.6
+python-multipart==0.0.20
+
+# --- Base de datos ---
+SQLAlchemy==2.0.43
+psycopg2-binary==2.9.10
+
+# --- Seguridad y autenticación ---
+bcrypt==4.3.0
+passlib==1.7.4
+python-jose==3.5.0
+email-validator==2.3.0
+
+# --- Utilidades ---
+python-dotenv==1.1.1
+requests==2.32.5
+pillow==11.3.0
+
+# --- Métricas y logs ---
+prometheus-client==0.23.1
+prometheus-fastapi-instrumentator==7.1.0
+loguru==0.7.3
+
+# --- Metadata / archivos ---
+python-magic==0.4.27
+PyExifTool==0.5.6
+
+# --- Dependencias de red / async ---
+anyio==4.10.0
+httptools==0.6.4
+uvloop==0.21.0; sys_platform != "win32"
+watchfiles==1.1.0
+websockets==12.0
+twilio
+pydantic-settings
+httpx==0.27.0
+python-magic

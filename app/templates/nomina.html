@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Nómina HECORP{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container">
+    <div class="columns is-vcentered mb-5">
+      <div class="column">
+        <p class="is-uppercase has-text-grey-light is-size-7 mb-2">HECORP · Nómina</p>
+        <h1 class="title is-3 has-text-white">Resumen de sueldos y prestaciones</h1>
+        <p class="subtitle is-6 has-text-grey-lighter">Archivo: {{ archivo }} · Total a pagar: ${{ "{:,.2f}".format(total_nomina) }} MXN</p>
+      </div>
+      <div class="column is-narrow">
+        <a class="button is-warning is-rounded" href="/nomina/download">
+          <span class="icon"><i class="fas fa-file-download"></i></span>
+          <span>Descargar CSV</span>
+        </a>
+      </div>
+    </div>
+
+    {% if registros %}
+    <div class="table-container">
+      <table class="table is-fullwidth is-striped is-hoverable">
+        <thead>
+          <tr>
+            {% for header in registros[0].keys() %}
+            <th>{{ header.replace('_',' ') }}</th>
+            {% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in registros %}
+          <tr>
+            {% for value in row.values() %}
+            <td>{{ value }}</td>
+            {% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="notification is-warning">No se encontraron registros en el CSV.</div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

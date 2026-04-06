@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Bot Telegram{% endblock %}
+{% block page_title %}Central de Bots{% endblock %}
+{% block content %}
+<div class="grid lg:grid-cols-2 gap-6">
+  <div class="card-glass">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Enviar boletín</p>
+    <form id="telegramForm" class="mt-4 space-y-3">
+      <input class="input" type="text" name="title" placeholder="Título" required>
+      <textarea class="textarea bg-slate-900 text-slate-100" name="comment" placeholder="Comentario" required></textarea>
+      <input class="input" type="url" name="link" placeholder="Link opcional">
+      <div class="flex gap-3">
+        <button type="submit" data-target="bot" class="button is-warning is-fullwidth">Enviar al BOT</button>
+        <button type="submit" data-target="group" class="button is-dark is-fullwidth">Enviar al GRUPO</button>
+      </div>
+    </form>
+    <div id="response" class="mt-4 text-xs text-slate-400"></div>
+  </div>
+  <div class="card-glass">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Actividades recientes</p>
+    <ul class="mt-4 space-y-3 text-sm text-slate-300">
+      <li>• 09:15 → Enviado boletín "Poképaradas nuevas"</li>
+      <li>• 10:05 → Bot respondió a un entrenador</li>
+      <li>• 11:20 → Recordatorio de rutas programado</li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+const form = document.getElementById('telegramForm');
+const responseDiv = document.getElementById('response');
+form.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const btn = ev.submitter;
+  const target = btn.dataset.target;
+  const data = new FormData(form);
+  const payload = {
+    title: data.get('title'),
+    comment: data.get('comment'),
+    link: data.get('link') || null
+  };
+  responseDiv.textContent = 'Enviando...';
+  try {
+    const res = await fetch(`/api/telegram/send/${target}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.detail || 'Error');
+    responseDiv.textContent = 'Enviado ✓';
+  } catch (err) {
+    responseDiv.textContent = 'Error: ' + err.message;
+  }
+});
+</script>
+{% endblock %}

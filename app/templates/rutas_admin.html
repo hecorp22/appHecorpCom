@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Gestor de Rutas{% endblock %}
+{% block page_title %}Panel de Rutas{% endblock %}
+{% block content %}
+<section class="grid lg:grid-cols-3 gap-6">
+  <div class="card-glass">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Buscar</p>
+    <form method="get" action="/rutas" class="mt-3 space-y-3">
+      <input class="input" type="text" name="q" value="{{ q }}" placeholder="Nombre de ruta">
+      <input type="hidden" name="page" value="1">
+      <button class="button is-warning is-fullwidth">Buscar</button>
+      <a href="/rutas" class="button is-light is-fullwidth">Limpiar</a>
+    </form>
+  </div>
+  <div class="card-glass lg:col-span-2">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Crear ruta manual</p>
+    <form id="frm-create" class="mt-3 grid gap-3" onsubmit="return false;">
+      <input class="input" name="nombre" placeholder="Nombre" required>
+      <div class="grid md:grid-cols-2 gap-3">
+        <input class="input" name="origen_lat" placeholder="origen_lat" required>
+        <input class="input" name="origen_lng" placeholder="origen_lng" required>
+        <input class="input" name="destino_lat" placeholder="destino_lat" required>
+        <input class="input" name="destino_lng" placeholder="destino_lng" required>
+      </div>
+      <div class="grid md:grid-cols-2 gap-3">
+        <input class="input" name="distancia_km" placeholder="distancia_km" required>
+        <input class="input" name="duracion_min" placeholder="duracion_min" required>
+      </div>
+      <textarea class="textarea bg-slate-900 text-slate-100" name="geojson" placeholder='GeoJSON Feature LineString'></textarea>
+      <textarea class="textarea bg-slate-900 text-slate-100" name="notas" placeholder="Notas"></textarea>
+      <button id="btn-create" class="button is-dark">Crear ruta</button>
+    </form>
+  </div>
+</section>
+
+<section class="card-glass mt-10">
+  <div class="table-card">
+    <table class="table is-fullwidth is-striped is-dark">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Nombre</th>
+          <th>Distancia</th>
+          <th>Duración</th>
+          <th>Creada</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="tb">
+        {% for r in rutas %}
+          <tr data-id="{{ r.id }}">
+            <td>{{ r.id }}</td>
+            <td contenteditable="true" data-field="nombre">{{ r.nombre }}</td>
+            <td contenteditable="true" data-field="distancia_km">{{ "%.3f"|format(r.distancia_km) }}</td>
+            <td contenteditable="true" data-field="duracion_min">{{ r.duracion_min }}</td>
+            <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else '—' }}</td>
+            <td class="flex gap-2">
+              <button class="button is-small is-dark btn-ver">Ver</button>
+              <button class="button is-small is-warning btn-guardar">Guardar</button>
+              <button class="button is-small is-danger btn-borrar">Eliminar</button>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="6">Sin rutas registradas.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="flex items-center gap-4 mt-4 text-sm">
+    {% if page > 1 %}
+      <a href="/rutas?page={{ page-1 }}&size={{ size }}&q={{ q }}" class="button is-small">← Anterior</a>
+    {% endif %}
+    <span>Página {{ page }} de {{ pages }}</span>
+    {% if page < pages %}
+      <a href="/rutas?page={{ page+1 }}&size={{ size }}&q={{ q }}" class="button is-small">Siguiente →</a>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+async function api(method, url, body) {
+  const opt = { method, headers: { "Content-Type": "application/json" } };
+  if (body) opt.body = JSON.stringify(body);
+  const res = await fetch(url, opt);
+  if (!res.ok) throw new Error("HTTP " + res.status);
+  return await res.json().catch(() => ({}));
+}
+
+document.getElementById('btn-create').addEventListener('click', async () => {
+  const f = document.getElementById('frm-create');
+  const form = new FormData(f);
+  const payload = {
+    nombre: form.get('nombre'),
+    origen_lat: parseFloat(form.get('origen_lat')),
+    origen_lng: parseFloat(form.get('origen_lng')),
+    destino_lat: parseFloat(form.get('destino_lat')),
+    destino_lng: parseFloat(form.get('destino_lng')),
+    distancia_km: parseFloat(form.get('distancia_km')),
+    duracion_min: parseInt(form.get('duracion_min')),
+    geojson: JSON.parse(form.get('geojson') || '{"type":"Feature","properties":{},"geometry":{"type":"LineString","coordinates":[]}}'),
+    notas: form.get('notas') || null
+  };
+  try {
+    await api('POST', '/api/rutas', payload);
+    location.reload();
+  } catch (e) {
+    alert('Error: ' + e.message);
+  }
+});
+
+document.getElementById('tb').addEventListener('click', async (ev) => {
+  const tr = ev.target.closest('tr[data-id]');
+  if (!tr) return;
+  const id = tr.dataset.id;
+
+  if (ev.target.classList.contains('btn-ver')) {
+    location.href = `/maps?ruta_id=${id}`;
+  }
+  if (ev.target.classList.contains('btn-guardar')) {
+    const data = {
+      nombre: tr.querySelector('[data-field="nombre"]').innerText.trim(),
+      distancia_km: parseFloat(tr.querySelector('[data-field="distancia_km"]').innerText.trim()),
+      duracion_min: parseInt(tr.querySelector('[data-field="duracion_min"]').innerText.trim()),
+    };
+    try {
+      await api('PATCH', `/api/rutas/${id}`, data);
+      alert('Guardado');
+    } catch (e) {
+      alert('Error: ' + e.message);
+    }
+  }
+  if (ev.target.classList.contains('btn-borrar')) {
+    if (!confirm('Eliminar ruta ' + id + '?')) return;
+    await api('DELETE', `/api/rutas/${id}`);
+    tr.remove();
+  }
+});
+</script>
+{% endblock %}

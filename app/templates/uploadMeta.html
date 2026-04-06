@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Subir archivo y extraer metadatos</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 40px; }
+        input[type="file"] { margin-bottom: 10px; }
+        #resultado { margin-top: 20px; white-space: pre-wrap; background: #f4f4f4; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Subir archivo y obtener metadatos</h1>
+
+    <form id="uploadForm">
+        <input type="file" name="file" id="fileInput" required>
+        <button type="submit">Enviar</button>
+    </form>
+
+    <div id="resultado"></div>
+
+    <script>
+        const form = document.getElementById('uploadForm');
+        const resultadoDiv = document.getElementById('resultado');
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append("file", file);
+
+            resultadoDiv.textContent = "Procesando...";
+
+            try {
+                const response = await fetch("/metadatos/", {
+                    method: "POST",
+                    body: formData
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    resultadoDiv.textContent = "Error: " + JSON.stringify(err, null, 4);
+                    return;
+                }
+
+                const data = await response.json();
+                resultadoDiv.textContent = JSON.stringify(data, null, 4);
+
+            } catch (err) {
+                resultadoDiv.textContent = "Error de conexión: " + err;
+            }
+        });
+    </script>
+</body>
+</html>

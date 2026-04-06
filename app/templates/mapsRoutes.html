@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Mapa & Rutas{% endblock %}
+{% block page_title %}Mapa interactivo de rutas{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.css" />
+<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css" />
+<style>
+  #map { height: 60vh; border-radius: 1.5rem; overflow: hidden; }
+</style>
+{% endblock %}
+{% block content %}
+<section class="grid lg:grid-cols-3 gap-6">
+  <div class="card-glass">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Control</p>
+    <form id="frm-ruta" class="mt-4 space-y-3">
+      <button type="button" id="btnMiUbicacion" class="button is-dark is-fullwidth">Usar mi ubicación</button>
+      <div>
+        <label class="label text-slate-300">Origen (lat,lng)</label>
+        <input class="input" id="origen" placeholder="Lat,Lng" />
+      </div>
+      <div>
+        <label class="label text-slate-300">Destino (lat,lng)</label>
+        <input class="input" id="destino" placeholder="Lat,Lng" />
+      </div>
+      <div class="flex gap-3">
+        <button class="button is-warning is-fullwidth" type="button" id="btnRuta">Trazar</button>
+        <button class="button is-light is-fullwidth" type="button" id="btnLimpiar">Limpiar</button>
+      </div>
+      <div class="text-xs text-slate-400" id="info"></div>
+    </form>
+  </div>
+  <div class="lg:col-span-2 card-glass p-0">
+    <div id="map"></div>
+  </div>
+</section>
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-routing-machine/dist/leaflet-routing-machine.js"></script>
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+<script src="/static/js/map.js"></script>
+{% endblock %}

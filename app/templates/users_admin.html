@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Administrar Usuarios{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container">
+    <h2 class="title is-4">Gestión de entrenadores</h2>
+    <p class="subtitle is-6">Solo visible para el superusuario.</p>
+
+    <div class="box">
+      <form method="post" enctype="multipart/form-data" class="columns is-multiline">
+        <div class="column is-4">
+          <label class="label">Correo</label>
+          <input class="input" type="email" name="email" required />
+        </div>
+        <div class="column is-4">
+          <label class="label">Nombre para mostrar</label>
+          <input class="input" type="text" name="display_name" placeholder="Entrenador" />
+        </div>
+        <div class="column is-4">
+          <label class="label">Rol</label>
+          <div class="select is-fullwidth">
+            <select name="role">
+              <option value="agent">Agente</option>
+              <option value="editor">Editor</option>
+              <option value="superuser">Superusuario</option>
+            </select>
+          </div>
+        </div>
+        <div class="column is-4">
+          <label class="label">Contraseña</label>
+          <input class="input" type="password" name="password" required />
+        </div>
+        <div class="column is-4">
+          <label class="label">Avatar</label>
+          <input class="input" type="file" name="avatar" accept="image/*" />
+        </div>
+        <div class="column is-4 is-flex is-align-items-flex-end">
+          <button class="button is-warning is-fullwidth" type="submit">Crear usuario</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="table-container">
+      <table class="table is-fullwidth is-striped">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Avatar</th>
+            <th>Email</th>
+            <th>Nombre</th>
+            <th>Rol</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for u in users %}
+          <tr>
+            <td>{{ u.id }}</td>
+            <td>
+              {% if u.avatar_url %}
+                <img src="{{ u.avatar_url }}" alt="avatar" style="width:40px;height:40px;border-radius:50%;object-fit:cover;">
+              {% else %}
+                —
+              {% endif %}
+            </td>
+            <td>{{ u.email }}</td>
+            <td>{{ u.display_name or '—' }}</td>
+            <td><span class="tag is-info">{{ u.role }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

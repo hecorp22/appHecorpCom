@@ -1,0 +1,153 @@
+/* ================================
+   Variables de colores y gradientes
+   ================================ */
+:root {
+    --bg-light: linear-gradient(135deg, #a1c4fd, #c2e9fb, #667eea, #764ba2);
+    --bg-dark: linear-gradient(135deg, #1a1a2e, #16213e, #0f0f1e, #1a1a2e);
+    --glass-light: rgba(255, 255, 255, 0.2);
+    --glass-dark: rgba(255, 255, 255, 0.08);
+    --text-light: #333;
+    --text-dark: #f1f1f1;
+    --button-light: #5563DE;
+    --button-dark: #4a90e2;
+}
+
+/* ====================
+   Fondo animado
+   ==================== */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--bg-light);
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-size: 400% 400%;
+    animation: gradientBG 15s ease infinite;
+    transition: background 0.4s ease;
+}
+
+@keyframes gradientBG {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* ====================
+   Contenedores
+   ==================== */
+.app-container, .login-container, .bot-container {
+    background: var(--glass-light);
+    padding: 40px 35px;
+    border-radius: 20px;
+    backdrop-filter: blur(12px);
+    box-shadow: 0 8px 20px rgba(0,0,0,0.25);
+    width: 600px;
+    max-width: 95%;
+    text-align: center;
+    color: var(--text-light);
+    transition: background 0.4s ease, color 0.4s ease;
+    opacity: 0;
+    transform: translateY(-20px);
+    animation: fadeInUp 0.6s forwards;
+}
+
+@keyframes fadeInUp {
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* ====================
+   Tipografía
+   ==================== */
+h1, h4 { margin-bottom: 25px; font-weight: 600; }
+p { margin-top: 15px; opacity: 0.85; }
+
+/* ====================
+   Inputs y textarea
+   ==================== */
+input[type="text"], input[type="email"], input[type="password"], input[type="file"], textarea {
+    width: 100%;
+    padding: 12px;
+    margin-bottom: 15px;
+    border-radius: 10px;
+    border: none;
+    background: rgba(255,255,255,0.3);
+    color: var(--text-light);
+    font-size: 15px;
+    transition: all 0.3s ease;
+}
+
+input:focus, textarea:focus {
+    background: rgba(255,255,255,0.45);
+    outline: none;
+    box-shadow: 0 0 8px rgba(0,0,0,0.25);
+}
+
+/* ====================
+   Botones
+   ==================== */
+button, .btn {
+    width: 48%;
+    padding: 12px;
+    margin: 3px 1%;
+    border: none;
+    border-radius: 10px;
+    font-size: 16px;
+    font-weight: bold;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.btn-success { background-color: #4CAF50; }
+.btn-success:hover { filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+
+.btn-primary { background-color: var(--button-light); }
+.btn-primary:hover { filter: brightness(1.1); transform: translateY(-2px); box-shadow: 0 5px 15px rgba(0,0,0,0.3); }
+
+button:active, .btn:active { transform: translateY(0); box-shadow: 0 2px 8px rgba(0,0,0,0.25); }
+
+/* ====================
+   Resultado / Respuesta
+   ==================== */
+#resultado, #response {
+    margin-top: 20px;
+    white-space: pre-wrap;
+    background: rgba(255,255,255,0.2);
+    padding: 10px;
+    border-radius: 10px;
+    max-height: 250px;
+    overflow-y: auto;
+    text-align: left;
+}
+
+/* ====================
+   Dark Mode
+   ==================== */
+@media (prefers-color-scheme: dark) {
+    body { background: var(--bg-dark); }
+    .app-container, .login-container, .bot-container { background: var(--glass-dark); color: var(--text-dark); }
+    input[type="text"], input[type="email"], input[type="password"], input[type="file"], textarea {
+        background: rgba(255,255,255,0.15);
+        color: var(--text-dark);
+    }
+    input:focus, textarea:focus { background: rgba(255,255,255,0.25); box-shadow: 0 0 8px rgba(255,255,255,0.25); }
+    .btn-primary { background-color: var(--button-dark); }
+}
+
+/* ====================
+   Responsive
+   ==================== */
+@media (max-width: 700px) {
+    .app-container, .login-container, .bot-container { width: 95%; padding: 30px 25px; }
+    button, .btn { width: 100%; margin: 5px 0; }
+}
+
+/* ====================
+   Input con íconos
+   ==================== */
+.input-icon { position: relative; margin-bottom: 18px; }
+.input-icon span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); }
+.input-icon input { padding-left: 35px; }

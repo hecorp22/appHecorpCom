@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Agenda HECORP{% endblock %}
+{% block page_title %}Agenda de Eventos{% endblock %}
+{% block content %}
+<div class="grid lg:grid-cols-3 gap-6">
+  <div class="card-glass">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Nuevo evento</p>
+    <form action="/agenda/crear" method="post" class="mt-4 space-y-3">
+      <input class="input" type="text" name="titulo" placeholder="Título" required>
+      <textarea class="textarea bg-slate-900 text-slate-100" name="descripcion" placeholder="Descripción"></textarea>
+      <input class="input" type="date" name="fecha" required>
+      <button class="button is-warning is-fullwidth" type="submit">Agregar evento</button>
+    </form>
+  </div>
+  <div class="card-glass lg:col-span-2">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Próximos eventos</p>
+    <table class="table is-fullwidth is-striped is-dark mt-4">
+      <thead>
+        <tr>
+          <th>Fecha</th>
+          <th>Título</th>
+          <th>Descripción</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for evento in eventos %}
+          <tr>
+            <td>{{ evento.fecha }}</td>
+            <td>{{ evento.titulo }}</td>
+            <td>{{ evento.descripcion or '—' }}</td>
+          </tr>
+        {% else %}
+          <tr><td colspan="3">No hay eventos registrados.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,16 @@
+# No subir archivos sensibles
+.env
+users.db
+
+# Cosas generadas
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Logs
+logs/
+*.log
+
+# Bases de datos y otros binarios
+*.sqlite3
