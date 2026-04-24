@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="theme-color" content="#0e7490">
+<title>HECORP · Ruta {{ drv.name }}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  body { background: #0b1422; color: #e2e8f0; font-family: system-ui; }
+  .pad { background:#101a2a; border:1px solid #1e293b; border-radius:14px; }
+  .chip { display:inline-block; padding:2px 10px; border-radius:999px; font-size:11px; }
+  .ch-pen { background:#7c2d12; color:#fdba74; }
+  .ch-on  { background:#075985; color:#7dd3fc; }
+  .ch-ok  { background:#064e3b; color:#6ee7b7; }
+  .ch-bad { background:#7f1d1d; color:#fca5a5; }
+  .ch-late{ background:#7f1d1d; color:#fda4af; }
+  button.b { padding:10px 12px; border-radius:10px; font-weight:600; font-size:13px; }
+  .b-on  { background:#0284c7; color:white; }
+  .b-ok  { background:#10b981; color:white; }
+  .b-bad { background:#ef4444; color:white; }
+  .gps-on  { color:#6ee7b7; }
+  .gps-off { color:#fca5a5; }
+  /* canvas firma */
+  canvas.sig { background:white; border-radius:8px; touch-action:none; width:100%; height:160px; }
+</style>
+</head>
+<body class="p-3">
+
+<header class="flex items-center justify-between pad p-3 mb-3">
+  <div>
+    <p class="text-xs text-cyan-300 uppercase tracking-widest">HECORP · Reparto</p>
+    <p class="text-base font-bold">{{ drv.name }}</p>
+    <p class="text-xs text-slate-400">
+      {{ drv.vehicle_type or '' }} {{ drv.vehicle_plate or '' }}
+    </p>
+  </div>
+  <div class="text-right">
+    <p class="text-xs text-slate-400">GPS</p>
+    <p class="font-bold gps-off" id="gps">desconectado</p>
+    <button class="text-xs underline mt-1" id="btnGps">activar</button>
+  </div>
+</header>
+
+<section class="pad p-3 mb-3 text-xs text-slate-400" id="bar">
+  Cargando...
+</section>
+
+<section id="list" class="space-y-3"></section>
+
+<!-- Modal de cierre -->
+<div id="modal" class="fixed inset-0 bg-black/70 hidden items-center justify-center z-50 p-3">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl p-4 w-full max-w-md max-h-[90vh] overflow-y-auto">
+    <h3 class="font-bold text-lg mb-2" id="modalTitle">Cerrar entrega</h3>
+    <input type="hidden" id="modalDid">
+    <input type="hidden" id="modalStatus">
+    <label class="text-xs text-slate-400">Mensaje al cliente</label>
+    <textarea id="modalMsg" rows="2" class="w-full p-2 rounded bg-slate-800 text-sm mb-2" placeholder="Recibido por..."></textarea>
+    <label class="text-xs text-slate-400">Reporte / notas</label>
+    <textarea id="modalRep" rows="2" class="w-full p-2 rounded bg-slate-800 text-sm mb-2"></textarea>
+    <div id="issueBlock" class="hidden">
+      <label class="text-xs text-slate-400">Tipo incidencia</label>
+      <select id="issueCode" class="w-full p-2 rounded bg-slate-800 text-sm mb-2">
+        <option value="ausente">Cliente ausente</option>
+        <option value="cerrado">Cerrado</option>
+        <option value="rechazo">Rechazo</option>
+        <option value="otro">Otro</option>
+      </select>
+      <textarea id="issueDetail" rows="2" class="w-full p-2 rounded bg-slate-800 text-sm mb-2" placeholder="Detalle"></textarea>
+    </div>
+
+    <label class="text-xs text-slate-400 block">📷 Foto</label>
+    <input id="photoInp" type="file" accept="image/*" capture="environment"
+           class="text-xs mb-2 block w-full">
+    <label class="text-xs text-slate-400 block">✍️ Firma</label>
+    <canvas id="sigCanvas" class="sig mb-1"></canvas>
+    <button class="text-xs text-slate-400 underline mb-3" id="sigClear">limpiar firma</button>
+
+    <div class="flex gap-2">
+      <button class="b b-on flex-1" id="btnCancel">Cancelar</button>
+      <button class="b b-ok flex-1" id="btnConfirm">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOKEN = "{{ token }}";
+
+// ---- helpers ----
+async function api(method, url, body, isForm=false) {
+  const opt = { method, headers: {} };
+  if (body && !isForm) { opt.headers['Content-Type'] = 'application/json'; opt.body = JSON.stringify(body); }
+  if (body && isForm) { opt.body = body; }
+  const r = await fetch(url, opt);
+  if (!r.ok) {
+    const t = await r.text().catch(()=> '');
+    throw new Error(`HTTP ${r.status} · ${t.slice(0,200)}`);
+  }
+  return r.json().catch(()=> ({}));
+}
+const fmt = ts => ts ? new Date(ts).toLocaleString() : '—';
+
+// ---- GPS tracking ----
+let watchId = null;
+const gpsEl = document.getElementById('gps');
+async function sendPing(pos) {
+  try {
+    await api('POST', `/api/delivery/track/${TOKEN}/ping`, {
+      lat: pos.coords.latitude, lng: pos.coords.longitude,
+      speed: pos.coords.speed, accuracy: pos.coords.accuracy,
+      heading: pos.coords.heading,
+    });
+    gpsEl.textContent = `📍 ${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`;
+    gpsEl.classList.remove('gps-off'); gpsEl.classList.add('gps-on');
+  } catch(e) {
+    gpsEl.textContent = 'error';
+    gpsEl.classList.add('gps-off');
+  }
+}
+document.getElementById('btnGps').addEventListener('click', () => {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    gpsEl.textContent = 'desconectado';
+    gpsEl.classList.remove('gps-on'); gpsEl.classList.add('gps-off');
+    return;
+  }
+  if (!navigator.geolocation) return alert('GPS no disponible');
+  watchId = navigator.geolocation.watchPosition(
+    sendPing,
+    err => { gpsEl.textContent = 'error'; alert('GPS: ' + err.message); },
+    { enableHighAccuracy: true, maximumAge: 5000, timeout: 15000 }
+  );
+});
+
+// ---- canvas firma ----
+const sig = document.getElementById('sigCanvas');
+const sctx = sig.getContext('2d');
+let sigDirty = false;
+function resizeSig() {
+  const r = sig.getBoundingClientRect();
+  sig.width = r.width; sig.height = r.height;
+  sctx.fillStyle = '#fff'; sctx.fillRect(0,0,sig.width,sig.height);
+  sctx.strokeStyle = '#0f172a'; sctx.lineWidth = 2; sctx.lineJoin='round';
+}
+let drawing=false, lastP=null;
+function pt(e){ const r = sig.getBoundingClientRect();
+  const t = e.touches ? e.touches[0] : e;
+  return { x: t.clientX - r.left, y: t.clientY - r.top };
+}
+function start(e){ e.preventDefault(); drawing=true; lastP = pt(e); sigDirty=true; }
+function move(e){ if(!drawing) return; e.preventDefault(); const p = pt(e);
+  sctx.beginPath(); sctx.moveTo(lastP.x,lastP.y); sctx.lineTo(p.x,p.y); sctx.stroke(); lastP=p;
+}
+function end(){ drawing=false; }
+['mousedown','touchstart'].forEach(ev=>sig.addEventListener(ev,start));
+['mousemove','touchmove'].forEach(ev=>sig.addEventListener(ev,move));
+['mouseup','mouseleave','touchend','touchcancel'].forEach(ev=>sig.addEventListener(ev,end));
+document.getElementById('sigClear').addEventListener('click', resizeSig);
+window.addEventListener('resize', () => { setTimeout(resizeSig, 100); });
+
+// ---- modal ----
+const modal = document.getElementById('modal');
+function openModal(d, status) {
+  document.getElementById('modalDid').value = d.id;
+  document.getElementById('modalStatus').value = status;
+  document.getElementById('modalTitle').textContent =
+    status === 'fallida' ? 'Marcar entrega FALLIDA' : 'Cerrar entrega como ENTREGADA';
+  document.getElementById('issueBlock').classList.toggle('hidden', status !== 'fallida');
+  document.getElementById('modalMsg').value = '';
+  document.getElementById('modalRep').value = '';
+  resizeSig(); sigDirty = false;
+  document.getElementById('photoInp').value = '';
+  modal.classList.remove('hidden'); modal.classList.add('flex');
+}
+function closeModal(){ modal.classList.add('hidden'); modal.classList.remove('flex'); }
+document.getElementById('btnCancel').addEventListener('click', closeModal);
+
+document.getElementById('btnConfirm').addEventListener('click', async () => {
+  const did = document.getElementById('modalDid').value;
+  const status = document.getElementById('modalStatus').value;
+  const body = {
+    delivery_id: parseInt(did),
+    status,
+    message: document.getElementById('modalMsg').value || null,
+    report: document.getElementById('modalRep').value || null,
+  };
+  if (status === 'fallida') {
+    body.issue_code = document.getElementById('issueCode').value;
+    body.issue_detail = document.getElementById('issueDetail').value || null;
+  }
+  try {
+    // 1. cambia status
+    await api('POST', `/api/delivery/track/${TOKEN}/status`, body);
+    // 2. sube firma si hay
+    if (sigDirty) {
+      const blob = await new Promise(res => sig.toBlob(res, 'image/png'));
+      const fd = new FormData(); fd.append('file', blob, 'sig.png');
+      await api('POST', `/api/delivery/${did}/upload/signature`, fd, true);
+    }
+    // 3. sube foto si hay
+    const f = document.getElementById('photoInp').files[0];
+    if (f) {
+      const fd = new FormData(); fd.append('file', f, f.name);
+      await api('POST', `/api/delivery/${did}/upload/photo`, fd, true);
+    }
+    closeModal();
+    await load();
+  } catch(e) { alert(e.message); }
+});
+
+// ---- listado ----
+async function load() {
+  const list = await api('GET', `/api/delivery?driver_id={{ drv.id }}`);
+  const today = new Date().toDateString();
+  const todays = list.filter(d => !d.scheduled_at || new Date(d.scheduled_at).toDateString() === today);
+  document.getElementById('bar').textContent =
+    `${todays.length} entregas · ${todays.filter(d => d.status==='entregado').length} entregadas`;
+
+  const c = document.getElementById('list');
+  c.innerHTML = '';
+  todays.forEach(d => {
+    const cust = d.customer || {};
+    const chip = d.is_late ? 'ch-late' :
+                 d.status==='entregado' ? 'ch-ok' :
+                 d.status==='fallida' ? 'ch-bad' :
+                 d.status==='en_ruta' ? 'ch-on' : 'ch-pen';
+    const div = document.createElement('div');
+    div.className = 'pad p-3';
+    div.innerHTML = `
+      <div class="flex items-start justify-between gap-2">
+        <div class="flex-1">
+          <div class="text-sm"><b>#${d.stop_order} · ${d.code}</b></div>
+          <div class="text-sm font-semibold mt-0.5">${cust.name || '—'}</div>
+          <div class="text-xs text-slate-400">${cust.address || ''}</div>
+          ${cust.reference ? `<div class="text-xs text-slate-500 italic">${cust.reference}</div>` : ''}
+          <div class="mt-2 flex flex-wrap gap-2 items-center text-xs">
+            <span class="chip ${chip}">${d.is_late ? 'RETRASADO' : d.status}</span>
+            ${d.product_summary ? `· ${d.product_summary}` : ''}
+            ${d.scheduled_at ? `· ${fmt(d.scheduled_at)}` : ''}
+          </div>
+        </div>
+      </div>
+      <div class="grid grid-cols-3 gap-2 mt-3">
+        ${cust.phone ? `<a class="b b-on text-center" href="tel:${cust.phone}">📞</a>` : '<span></span>'}
+        ${cust.lat && cust.lng ? `<a class="b b-on text-center" target="_blank"
+          href="https://www.google.com/maps/dir/?api=1&destination=${cust.lat},${cust.lng}">🧭</a>` : '<span></span>'}
+        <span></span>
+      </div>
+      <div class="grid grid-cols-3 gap-2 mt-2">
+        <button class="b b-on"  data-id="${d.id}" data-act="en_ruta"  ${d.status!=='pendiente'?'disabled style=opacity:.5':''}>En ruta</button>
+        <button class="b b-ok"  data-id="${d.id}" data-act="entregado" ${d.status==='entregado'?'disabled style=opacity:.5':''}>Entregar</button>
+        <button class="b b-bad" data-id="${d.id}" data-act="fallida"   ${d.status==='entregado'?'disabled style=opacity:.5':''}>Fallida</button>
+      </div>`;
+
+    div.querySelectorAll('button[data-act]').forEach(btn => btn.addEventListener('click', async () => {
+      const act = btn.dataset.act;
+      if (act === 'en_ruta') {
+        try { await api('POST', `/api/delivery/track/${TOKEN}/status`,
+          { delivery_id: parseInt(btn.dataset.id), status: 'en_ruta' });
+          load(); } catch(e){ alert(e.message); }
+      } else {
+        openModal({ id: parseInt(btn.dataset.id) }, act);
+      }
+    }));
+    c.appendChild(div);
+  });
+}
+
+load();
+setInterval(load, 60000);
+</script>
+</body>
+</html>

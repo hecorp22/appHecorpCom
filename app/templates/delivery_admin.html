@@ -153,6 +153,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
   { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
 
 const markers = {}; // delivery.id -> Leaflet marker
+const driverMarkers = {}; // driver.id -> Leaflet marker en vivo
 let currentFilter = '';
 
 function colorFor(d) {
@@ -203,6 +204,26 @@ async function loadSelects() {
     });
     sel.value = keep;
   };
+  // pinta choferes en vivo
+  Object.values(driverMarkers).forEach(m => map.removeLayer(m));
+  for (const d of drivers) {
+    if (d.last_lat && d.last_lng) {
+      const last = d.last_seen_at ? new Date(d.last_seen_at) : null;
+      const fresh = last && (Date.now() - last.getTime() < 5*60*1000);
+      const icon = L.divIcon({
+        className:'drv-dot',
+        html:`<div style="background:${fresh?'#22d3ee':'#64748b'};color:#fff;
+          padding:3px 8px;border-radius:999px;font-size:11px;border:2px solid #fff;
+          box-shadow:0 0 6px rgba(0,0,0,.6);white-space:nowrap;">🚚 ${d.name.split(' ')[0]}</div>`,
+        iconAnchor: [30, 12]
+      });
+      driverMarkers[d.id] = L.marker([d.last_lat, d.last_lng], { icon })
+        .addTo(map)
+        .bindPopup(`<b>${d.name}</b><br>${d.vehicle_plate||''}<br>
+          Último ping: ${last ? last.toLocaleString() : '—'}<br>
+          <a href="/driver/${d.track_token}" target="_blank">Abrir PWA</a>`);
+    }
+  }
   fill('sel-driver', drivers, d => `${d.name}${d.vehicle_plate?' ('+d.vehicle_plate+')':''}`);
   fill('sel-driver-run', drivers, d => d.name);
   fill('sel-cust', custs, c => `${c.name} · ${c.address.slice(0,40)}`);
@@ -274,6 +295,8 @@ async function loadDeliveries() {
           <button class="button is-small is-link"  data-id="${d.id}" data-s="en_ruta">En ruta</button>
           <button class="button is-small is-success" data-id="${d.id}" data-s="entregado">Entregar</button>
           <button class="button is-small is-danger"  data-id="${d.id}" data-s="fallida">Fallida</button>
+          <a class="button is-small is-dark" href="/api/delivery/${d.id}/pdf" target="_blank">PDF</a>
+          <a class="button is-small is-dark" href="/track/d/${d.code}" target="_blank">Tracking</a>
         </div>
       </div>`;
     div.querySelectorAll('button').forEach(b => b.addEventListener('click', async () => {

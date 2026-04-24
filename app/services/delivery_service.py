@@ -2,17 +2,24 @@
 Servicio de entregas (delivery) — víveres/tortillas/paquetes.
 Genera códigos, controla estado, detecta retrasos, notifica admin.
 """
+import os
+import secrets
 import uuid
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import List, Optional, Dict, Any
 
-from fastapi import HTTPException
+from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from app.models.delivery import Driver, DeliveryCustomer, Delivery, DeliveryRun
+from app.models.delivery import Driver, DeliveryCustomer, Delivery, DeliveryRun, DriverPing
 from app.services.admin_notify import _send as admin_send
 from app.services.sms_service import send_sms
+
+# directorio de uploads servido como /static/uploads/...
+UPLOAD_DIR = Path("app/static/uploads/delivery")
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 # --------------------------------------------------------------------------- #
@@ -46,8 +53,50 @@ def list_drivers(db: Session, active: Optional[int] = None) -> List[Driver]:
 
 def create_driver(db: Session, data: Dict[str, Any]) -> Driver:
     d = Driver(**data)
+    if not d.track_token:
+        d.track_token = secrets.token_urlsafe(24)
     db.add(d); db.commit(); db.refresh(d)
     return d
+
+
+def ensure_driver_token(db: Session, driver_id: int) -> Driver:
+    """Genera (o regenera) el token de tracking del chofer."""
+    d = db.query(Driver).filter_by(id=driver_id).first()
+    if not d:
+        raise HTTPException(404, "Chofer no encontrado")
+    d.track_token = secrets.token_urlsafe(24)
+    db.commit(); db.refresh(d)
+    return d
+
+
+def driver_by_token(db: Session, token: str) -> Driver:
+    d = db.query(Driver).filter_by(track_token=token).first()
+    if not d or not d.active:
+        raise HTTPException(404, "Token inválido o chofer inactivo")
+    return d
+
+
+def record_ping(db: Session, driver: Driver, lat: float, lng: float,
+                speed: Optional[float] = None,
+                accuracy: Optional[float] = None,
+                heading: Optional[float] = None) -> DriverPing:
+    ping = DriverPing(
+        driver_id=driver.id, lat=lat, lng=lng,
+        speed=speed, accuracy=accuracy, heading=heading,
+    )
+    db.add(ping)
+    driver.last_lat = lat
+    driver.last_lng = lng
+    driver.last_seen_at = datetime.utcnow()
+    db.commit(); db.refresh(ping)
+    return ping
+
+
+def recent_pings(db: Session, driver_id: int, since_min: int = 240) -> List[DriverPing]:
+    cutoff = datetime.utcnow() - timedelta(minutes=since_min)
+    return (db.query(DriverPing)
+            .filter(DriverPing.driver_id == driver_id, DriverPing.ts >= cutoff)
+            .order_by(DriverPing.ts).all())
 
 
 def update_driver(db: Session, driver_id: int, data: Dict[str, Any]) -> Driver:
@@ -291,6 +340,43 @@ def change_delivery_status(db: Session, did: int, status: str,
                        f"Entrega {d.code} marcada {status}. {(issue_detail or '')[:200]}")
     except Exception:
         pass
+    return d
+
+
+# --------------------------------------------------------------------------- #
+# Uploads (foto / firma) y PDF
+# --------------------------------------------------------------------------- #
+ALLOWED_IMG = {".jpg", ".jpeg", ".png", ".webp"}
+
+
+def _save_upload(file: UploadFile, prefix: str, did: int) -> str:
+    if not file.filename:
+        raise HTTPException(400, "Archivo sin nombre")
+    ext = Path(file.filename).suffix.lower() or ".jpg"
+    if ext not in ALLOWED_IMG:
+        raise HTTPException(400, f"Extensión no permitida ({ext})")
+    name = f"{prefix}_{did}_{uuid.uuid4().hex[:10]}{ext}"
+    dest = UPLOAD_DIR / name
+    data = file.file.read()
+    if len(data) > 6 * 1024 * 1024:
+        raise HTTPException(400, "Archivo > 6 MB")
+    dest.write_bytes(data)
+    # ruta relativa servida vía /static/...
+    return f"/static/uploads/delivery/{name}"
+
+
+def attach_artifact(db: Session, did: int, kind: str, file: UploadFile) -> Delivery:
+    if kind not in ("photo", "signature", "ticket"):
+        raise HTTPException(400, "kind debe ser photo, signature o ticket")
+    d = get_delivery(db, did)
+    url = _save_upload(file, kind, did)
+    if kind == "photo":
+        d.photo_url = url
+    elif kind == "signature":
+        d.signature_url = url
+    elif kind == "ticket":
+        d.ticket_url = url
+    db.commit(); db.refresh(d)
     return d
 
 

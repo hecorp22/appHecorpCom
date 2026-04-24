@@ -34,6 +34,18 @@
         {% if d.ticket_number %}<div>🧾 Ticket: {{ d.ticket_number }}</div>{% endif %}
         {% if d.delivery_message %}<div class="mt-2 text-slate-300 italic">"{{ d.delivery_message }}"</div>{% endif %}
       </div>
+      {% if d.photo_url or d.signature_url %}
+      <div class="grid grid-cols-2 gap-2 mt-3">
+        {% if d.photo_url %}
+          <div><p class="text-xs text-slate-400">Foto</p>
+            <img src="{{ d.photo_url }}" class="rounded-lg border border-slate-700 w-full"></div>
+        {% endif %}
+        {% if d.signature_url %}
+          <div><p class="text-xs text-slate-400">Firma</p>
+            <img src="{{ d.signature_url }}" class="rounded-lg border border-slate-700 w-full bg-white"></div>
+        {% endif %}
+      </div>
+      {% endif %}
     </section>
 
     {% if cust and cust.lat and cust.lng %}

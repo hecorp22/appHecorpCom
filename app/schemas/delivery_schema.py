@@ -21,6 +21,10 @@ class DriverOut(DriverIn):
     model_config = MODEL_CFG
     id: int
     created_at: datetime
+    last_lat: Optional[float] = None
+    last_lng: Optional[float] = None
+    last_seen_at: Optional[datetime] = None
+    track_token: Optional[str] = None
 
 
 # ---------- Customer ----------

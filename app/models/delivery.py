@@ -6,7 +6,8 @@ Independiente del módulo Shipment (que es de Aleaciones y Maquinados).
 from datetime import datetime
 from decimal import Decimal
 from sqlalchemy import (
-    Column, Integer, String, Float, DateTime, ForeignKey, Text, Numeric, Index
+    Column, Integer, String, Float, DateTime, ForeignKey, Text, Numeric, Index,
+    Boolean,
 )
 from sqlalchemy.orm import relationship
 from sqlalchemy.dialects.postgresql import JSONB
@@ -32,8 +33,37 @@ class Driver(Base):
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
 
+    # tracking en vivo
+    last_lat = Column(Float, nullable=True)
+    last_lng = Column(Float, nullable=True)
+    last_seen_at = Column(DateTime, nullable=True)
+    track_token = Column(String(64), nullable=True, unique=True)  # para PWA del chofer
+
     deliveries = relationship("Delivery", back_populates="driver")
     runs = relationship("DeliveryRun", back_populates="driver")
+    pings = relationship("DriverPing", back_populates="driver", cascade="all,delete-orphan")
+
+
+# --------------------------------------------------------------------------- #
+# DriverPing (histórico de coordenadas en vivo)
+# --------------------------------------------------------------------------- #
+class DriverPing(Base):
+    __tablename__ = "delivery_driver_pings"
+    __table_args__ = (
+        Index("ix_pings_driver_time", "driver_id", "ts"),
+        {"schema": SCHEMA},
+    )
+
+    id = Column(Integer, primary_key=True)
+    driver_id = Column(Integer, ForeignKey(f"{SCHEMA}.delivery_drivers.id", ondelete="CASCADE"), nullable=False)
+    lat = Column(Float, nullable=False)
+    lng = Column(Float, nullable=False)
+    speed = Column(Float, nullable=True)            # m/s
+    accuracy = Column(Float, nullable=True)         # metros
+    heading = Column(Float, nullable=True)
+    ts = Column(DateTime, nullable=False, default=datetime.utcnow)
+
+    driver = relationship("Driver", back_populates="pings")
 
 
 # --------------------------------------------------------------------------- #

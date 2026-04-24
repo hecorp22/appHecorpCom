@@ -5,8 +5,10 @@ Monta /delivery (HTML admin + tracking público) y /api/delivery (JSON).
 from typing import Optional
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, Depends, Request, HTTPException, Query, Body
-from fastapi.responses import HTMLResponse
+from fastapi import (
+    APIRouter, Depends, Request, HTTPException, Query, Body, UploadFile, File,
+)
+from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
@@ -19,6 +21,7 @@ from app.schemas.delivery_schema import (
     DeliveryRunIn, DeliveryRunOut,
 )
 from app.services import delivery_service as svc
+from app.services.delivery_pdf import build_delivery_pdf
 
 templates = Jinja2Templates(directory="app/templates")
 
@@ -45,6 +48,24 @@ def public_track_delivery(code: str, request: Request, db: Session = Depends(get
     return templates.TemplateResponse(
         "delivery_track_public.html",
         {"request": request, "d": d, "cust": d.customer, "drv": d.driver},
+    )
+
+
+@html.get("/driver/{token}", response_class=HTMLResponse)
+def driver_pwa(token: str, request: Request, db: Session = Depends(get_db)):
+    """PWA del chofer: ve sus entregas asignadas hoy y manda GPS."""
+    drv = svc.driver_by_token(db, token)
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    tomorrow = today + timedelta(days=1)
+    deliveries = (db.query(svc.Delivery)
+                  .filter(svc.Delivery.driver_id == drv.id)
+                  .filter((svc.Delivery.scheduled_at == None) |
+                          ((svc.Delivery.scheduled_at >= today) &
+                           (svc.Delivery.scheduled_at < tomorrow)))
+                  .order_by(svc.Delivery.stop_order, svc.Delivery.id).all())
+    return templates.TemplateResponse(
+        "driver_pwa.html",
+        {"request": request, "drv": drv, "deliveries": deliveries, "token": token},
     )
 
 
@@ -205,6 +226,77 @@ def api_delivery_delete(did: int,
                         _=Depends(get_current_user_from_cookie)):
     svc.delete_delivery(db, did)
     return {"ok": True}
+
+
+# ---- artefactos (foto / firma / ticket) ----
+@api.post("/{did}/upload/{kind}", response_model=DeliveryOut)
+def api_delivery_upload(did: int, kind: str,
+                        file: UploadFile = File(...),
+                        db: Session = Depends(get_db),
+                        _=Depends(get_current_user_from_cookie)):
+    return svc.attach_artifact(db, did, kind, file)
+
+
+@api.get("/{did}/pdf")
+def api_delivery_pdf(did: int,
+                     db: Session = Depends(get_db),
+                     _=Depends(get_current_user_from_cookie)):
+    d = svc.get_delivery(db, did)
+    pdf = build_delivery_pdf(d)
+    return Response(
+        content=pdf, media_type="application/pdf",
+        headers={"Content-Disposition": f'inline; filename="{d.code}.pdf"'},
+    )
+
+
+# ---- driver tracking (sin login: solo token) ----
+@api.post("/drivers/{did}/token", response_model=DriverOut)
+def api_driver_token(did: int,
+                     db: Session = Depends(get_db),
+                     _=Depends(get_current_user_from_cookie)):
+    return svc.ensure_driver_token(db, did)
+
+
+@api.post("/track/{token}/ping")
+def api_driver_ping(token: str,
+                    lat: float = Body(..., embed=True),
+                    lng: float = Body(..., embed=True),
+                    speed: Optional[float] = Body(None, embed=True),
+                    accuracy: Optional[float] = Body(None, embed=True),
+                    heading: Optional[float] = Body(None, embed=True),
+                    db: Session = Depends(get_db)):
+    drv = svc.driver_by_token(db, token)
+    p = svc.record_ping(db, drv, lat, lng, speed=speed, accuracy=accuracy, heading=heading)
+    return {"ok": True, "driver_id": drv.id, "ts": p.ts.isoformat()}
+
+
+@api.post("/track/{token}/status")
+def api_driver_status_change(token: str,
+                             delivery_id: int = Body(..., embed=True),
+                             status: str = Body(..., embed=True),
+                             message: Optional[str] = Body(None, embed=True),
+                             report: Optional[str] = Body(None, embed=True),
+                             issue_code: Optional[str] = Body(None, embed=True),
+                             issue_detail: Optional[str] = Body(None, embed=True),
+                             db: Session = Depends(get_db)):
+    """El chofer cambia el status de su entrega desde la PWA."""
+    drv = svc.driver_by_token(db, token)
+    d = svc.get_delivery(db, delivery_id)
+    if d.driver_id != drv.id:
+        raise HTTPException(403, "Esta entrega no pertenece al chofer")
+    return svc.change_delivery_status(db, delivery_id, status,
+                                      message=message, report=report,
+                                      issue_code=issue_code, issue_detail=issue_detail)
+
+
+@api.get("/drivers/{did}/pings")
+def api_driver_pings(did: int,
+                     since_min: int = 240,
+                     db: Session = Depends(get_db),
+                     _=Depends(get_current_user_from_cookie)):
+    pings = svc.recent_pings(db, did, since_min=since_min)
+    return [{"lat": p.lat, "lng": p.lng, "ts": p.ts.isoformat(),
+             "speed": p.speed, "heading": p.heading} for p in pings]
 
 
 # ---- kpi ----
