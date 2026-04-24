@@ -529,6 +529,99 @@ def optimize_run(db: Session, run_id: int,
     }
 
 
+# --------------------------------------------------------------------------- #
+# Alertas automáticas (consumido por cron)
+# --------------------------------------------------------------------------- #
+GPS_STALE_MIN = 15      # chofer sin ping en N min durante jornada en curso
+LATE_MIN = 30           # entrega con eta/window/scheduled vencido por N min
+ALERT_COOLDOWN_MIN = 60 # no alerta dos veces por la misma cosa en N min
+
+# memoria simple en proceso (suficiente para 1 contenedor; reinicio = se reenvían)
+_alert_sent: Dict[str, datetime] = {}
+
+
+def _should_alert(key: str) -> bool:
+    last = _alert_sent.get(key)
+    if last and (datetime.utcnow() - last) < timedelta(minutes=ALERT_COOLDOWN_MIN):
+        return False
+    _alert_sent[key] = datetime.utcnow()
+    return True
+
+
+def run_alerts(db: Session) -> Dict[str, Any]:
+    """
+    Recorre choferes en jornada activa y entregas pendientes.
+    Manda SMS+correo al admin cuando detecta:
+      - chofer sin GPS por > GPS_STALE_MIN minutos
+      - entrega con > LATE_MIN minutos de retraso
+    Devuelve resumen.
+    """
+    now = datetime.utcnow()
+    alerts = {"gps_stale": [], "late": []}
+
+    # 1) choferes con jornada en_curso pero ping viejo
+    runs_active = db.query(DeliveryRun).filter(DeliveryRun.status == "en_curso").all()
+    for r in runs_active:
+        if not r.driver_id:
+            continue
+        drv = db.query(Driver).filter_by(id=r.driver_id).first()
+        if not drv:
+            continue
+        last_seen = drv.last_seen_at
+        stale = (not last_seen) or (now - last_seen > timedelta(minutes=GPS_STALE_MIN))
+        if stale:
+            key = f"gps:{drv.id}:{r.id}:{(last_seen or now).strftime('%Y%m%d%H')}"
+            if _should_alert(key):
+                msg = (f"⚠️ HECORP\nChofer {drv.name} sin GPS"
+                       f" desde {last_seen.strftime('%H:%M') if last_seen else 'nunca'}.\n"
+                       f"Jornada {r.code} en curso.")
+                try:
+                    admin_send("gps_stale", f"GPS chofer {drv.name}", msg)
+                except Exception:
+                    pass
+                alerts["gps_stale"].append({
+                    "driver_id": drv.id, "driver": drv.name,
+                    "last_seen": last_seen.isoformat() if last_seen else None,
+                    "run_code": r.code,
+                })
+
+    # 2) entregas activas con retraso fuerte
+    candidates = (db.query(Delivery)
+                  .filter(Delivery.status.notin_(["entregado", "cancelada"]))
+                  .all())
+    for d in candidates:
+        ref = d.eta_at or d.window_end or d.scheduled_at
+        if not ref:
+            continue
+        delay = (now - ref).total_seconds() / 60.0
+        if delay < LATE_MIN:
+            continue
+        key = f"late:{d.id}:{int(delay // 30)}"   # se renueva cada 30 min
+        if _should_alert(key):
+            cust = d.customer
+            msg = (f"🔴 HECORP\nEntrega {d.code} con {int(delay)} min de retraso.\n"
+                   f"Cliente: {cust.name if cust else '—'}\n"
+                   f"Status: {d.status}")
+            try:
+                admin_send("delivery_late", f"Entrega {d.code} retrasada", msg)
+            except Exception:
+                pass
+            alerts["late"].append({
+                "delivery_id": d.id, "code": d.code,
+                "delay_min": int(delay),
+                "customer": cust.name if cust else None,
+                "status": d.status,
+            })
+
+    return {
+        "checked_at": now.isoformat(),
+        "runs_active": len(runs_active),
+        "alerts_gps": len(alerts["gps_stale"]),
+        "alerts_late": len(alerts["late"]),
+        "detail": alerts,
+    }
+
+
 def kpi_today(db: Session) -> Dict[str, Any]:
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     tomorrow = today + timedelta(days=1)

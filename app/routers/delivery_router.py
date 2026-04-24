@@ -5,8 +5,10 @@ Monta /delivery (HTML admin + tracking público) y /api/delivery (JSON).
 from typing import Optional
 from datetime import datetime, timedelta
 
+import os
 from fastapi import (
     APIRouter, Depends, Request, HTTPException, Query, Body, UploadFile, File,
+    Header,
 )
 from fastapi.responses import HTMLResponse, Response
 from fastapi.templating import Jinja2Templates
@@ -314,3 +316,13 @@ def api_driver_pings(did: int,
 def api_kpi_today(db: Session = Depends(get_db),
                   _=Depends(get_current_user_from_cookie)):
     return svc.kpi_today(db)
+
+
+# ---- cron de alertas (sin login, protegido por CRON_TOKEN) ----
+@api.post("/cron/check")
+def api_cron_check(x_cron_token: Optional[str] = Header(None),
+                   db: Session = Depends(get_db)):
+    expected = os.getenv("CRON_TOKEN")
+    if not expected or x_cron_token != expected:
+        raise HTTPException(401, "Cron token inválido")
+    return svc.run_alerts(db)
