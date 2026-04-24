@@ -33,6 +33,7 @@ from app.models import quotation as _m_quote  # noqa: F401
 from app.models import provider_account as _m_pa  # noqa: F401
 from app.models import order as _m_order           # noqa: F401
 from app.models import shipment as _m_shipment     # noqa: F401
+from app.models import delivery as _m_delivery     # noqa: F401
 
 # NUEVO: logs + métricas
 from app.core.logging_conf import setup_logging
@@ -146,6 +147,10 @@ app.include_router(notify_router.router)
 app.include_router(maps.router)
 app.include_router(rutas_router.router)
 app.include_router(rutas_router.api)
+# Módulo Delivery (víveres/tortillas/paquetes)
+from app.routers import delivery_router  # noqa: E402
+app.include_router(delivery_router.html)
+app.include_router(delivery_router.api)
 app.include_router(cfdi_router.router)
 app.include_router(telegram_webhook.router)
 app.include_router(face_router.router)

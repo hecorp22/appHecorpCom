@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Entrega {{ d.code }}</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<style>body{background:#0b1422;color:#e2e8f0;font-family:system-ui} #m{height:45vh}</style>
+</head>
+<body class="p-4">
+  <div class="max-w-xl mx-auto space-y-4">
+    <header class="border border-cyan-700 bg-cyan-950/40 rounded-xl p-4">
+      <h1 class="text-xl font-bold">Entrega {{ d.code }}</h1>
+      <p class="text-sm text-slate-400">{{ cust.name if cust else '' }}</p>
+    </header>
+
+    <section class="rounded-xl border border-slate-800 p-4">
+      <div class="flex items-center justify-between">
+        <span class="text-xs uppercase tracking-widest text-slate-400">Estado</span>
+        <span class="px-3 py-1 rounded-full text-sm
+          {% if d.status == 'entregado' %}bg-emerald-900 text-emerald-200
+          {% elif d.is_late %}bg-red-900 text-red-200
+          {% elif d.status == 'en_ruta' %}bg-sky-900 text-sky-200
+          {% else %}bg-amber-900 text-amber-200{% endif %}">
+          {{ 'RETRASADO' if d.is_late else d.status|upper }}
+        </span>
+      </div>
+      <div class="mt-3 text-sm space-y-1">
+        {% if cust %}<div>📍 {{ cust.address }}</div>{% endif %}
+        {% if d.scheduled_at %}<div>🗓 Programada: {{ d.scheduled_at.strftime('%Y-%m-%d %H:%M') }}</div>{% endif %}
+        {% if d.eta_at %}<div>⏱ ETA: {{ d.eta_at.strftime('%Y-%m-%d %H:%M') }}</div>{% endif %}
+        {% if drv %}<div>🚚 Chofer: {{ drv.name }}{% if drv.vehicle_plate %} · {{ drv.vehicle_plate }}{% endif %}</div>{% endif %}
+        {% if d.product_summary %}<div>📦 {{ d.product_summary }}</div>{% endif %}
+        {% if d.ticket_number %}<div>🧾 Ticket: {{ d.ticket_number }}</div>{% endif %}
+        {% if d.delivery_message %}<div class="mt-2 text-slate-300 italic">"{{ d.delivery_message }}"</div>{% endif %}
+      </div>
+    </section>
+
+    {% if cust and cust.lat and cust.lng %}
+    <div id="m" class="rounded-xl border border-slate-800 overflow-hidden"></div>
+    <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script>
+      const m = L.map('m').setView([{{ cust.lat }}, {{ cust.lng }}], 15);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+        {attribution:'&copy; OSM'}).addTo(m);
+      L.marker([{{ cust.lat }}, {{ cust.lng }}]).addTo(m).bindPopup('{{ cust.name }}').openPopup();
+    </script>
+    {% endif %}
+
+    <footer class="text-xs text-slate-500 text-center pt-6 border-t border-slate-800">
+      Seguimiento de entrega · actualizado en tiempo real al recargar
+    </footer>
+  </div>
+</body>
+</html>

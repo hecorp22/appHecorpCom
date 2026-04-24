@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+{% block title %}Entregas / Monitoreo de rutas{% endblock %}
+{% block page_title %}Entregas · Monitoreo{% endblock %}
+{% block extra_css %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<style>
+  .kpi { background: linear-gradient(135deg, rgba(19,164,181,.18), rgba(10,110,122,.28));
+         border:1px solid rgba(19,164,181,.35); }
+  .kpi-amber { background: linear-gradient(135deg, rgba(185,139,58,.15), rgba(185,139,58,.35));
+               border:1px solid rgba(227,196,146,.45); }
+  .kpi-red { background: linear-gradient(135deg, rgba(239,68,68,.15), rgba(220,38,38,.35));
+             border:1px solid rgba(239,68,68,.45); }
+  #map { height: 56vh; border-radius: 1rem; }
+  .chip { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px;
+          background:#1e293b; border:1px solid #334155; }
+  .chip.on { background:#0f766e; border-color:#14b8a6; }
+  .chip.late { background:#7f1d1d; border-color:#ef4444; }
+  .chip.done { background:#064e3b; border-color:#10b981; }
+  .card-min { background:#0b1422; border:1px solid #1e293b; border-radius:10px; padding:10px; }
+</style>
+{% endblock %}
+{% block content %}
+
+<section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+  <div class="kpi p-4 rounded-xl">
+    <p class="text-xs uppercase tracking-widest text-cyan-300">Jornadas hoy</p>
+    <p class="text-3xl font-bold mt-1" id="k-runs">{{ kpi.runs_today }}</p>
+  </div>
+  <div class="kpi p-4 rounded-xl">
+    <p class="text-xs uppercase tracking-widest text-cyan-300">Entregas hoy</p>
+    <p class="text-3xl font-bold mt-1" id="k-total">{{ kpi.deliveries_today }}</p>
+  </div>
+  <div class="kpi-amber p-4 rounded-xl">
+    <p class="text-xs uppercase tracking-widest text-amber-200">Entregadas</p>
+    <p class="text-3xl font-bold mt-1" id="k-done">{{ kpi.by_status.get('entregado', 0) }}</p>
+  </div>
+  <div class="kpi-red p-4 rounded-xl">
+    <p class="text-xs uppercase tracking-widest text-red-200">Con retraso</p>
+    <p class="text-3xl font-bold mt-1" id="k-late">{{ kpi.late_count }}</p>
+  </div>
+</section>
+
+<section class="grid lg:grid-cols-5 gap-6 mt-6">
+
+  <!-- sidebar de acciones -->
+  <aside class="lg:col-span-2 space-y-4">
+
+    <!-- crear jornada -->
+    <div class="card-glass">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Nueva jornada</p>
+      <form id="frm-run" class="mt-3 grid gap-2" onsubmit="return false;">
+        <input class="input" name="name" placeholder="Nombre (ej. Ruta Orizaba centro)" required>
+        <input class="input" type="datetime-local" name="scheduled_date" required>
+        <select class="input" name="driver_id" id="sel-driver-run"><option value="">— Chofer —</option></select>
+        <select class="input" name="ruta_id" id="sel-ruta-run"><option value="">— Ruta trazada (opcional) —</option></select>
+        <textarea class="textarea bg-slate-900 text-slate-100" name="notes" placeholder="Notas"></textarea>
+        <button class="button is-dark">Crear jornada</button>
+      </form>
+    </div>
+
+    <!-- crear entrega -->
+    <div class="card-glass">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Nueva entrega</p>
+      <form id="frm-del" class="mt-3 grid gap-2" onsubmit="return false;">
+        <select class="input" name="run_id" id="sel-run"><option value="">— Jornada —</option></select>
+        <select class="input" name="customer_id" id="sel-cust" required><option value="">— Cliente de reparto —</option></select>
+        <select class="input" name="driver_id" id="sel-driver"><option value="">— Chofer —</option></select>
+        <div class="grid grid-cols-2 gap-2">
+          <input class="input" name="stop_order" type="number" value="1" min="1">
+          <input class="input" name="scheduled_at" type="datetime-local">
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <input class="input" name="window_start" type="datetime-local">
+          <input class="input" name="window_end" type="datetime-local">
+        </div>
+        <input class="input" name="product_summary" placeholder="Producto (ej. 3 cajas tortilla)">
+        <div class="grid grid-cols-2 gap-2">
+          <input class="input" name="amount" type="number" step="0.01" placeholder="Monto">
+          <input class="input" name="ticket_number" placeholder="Ticket/Factura">
+        </div>
+        <button class="button is-warning">Agregar entrega</button>
+      </form>
+    </div>
+
+    <!-- cliente de reparto -->
+    <div class="card-glass">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Cliente de reparto</p>
+      <form id="frm-cust" class="mt-3 grid gap-2" onsubmit="return false;">
+        <input class="input" name="name" placeholder="Nombre del negocio" required>
+        <input class="input" name="contact_name" placeholder="Encargado">
+        <input class="input" name="phone" placeholder="Teléfono">
+        <input class="input" name="address" placeholder="Dirección" required>
+        <input class="input" name="reference" placeholder="Referencia">
+        <div class="grid grid-cols-2 gap-2">
+          <input class="input" name="lat" placeholder="lat" type="number" step="0.000001">
+          <input class="input" name="lng" placeholder="lng" type="number" step="0.000001">
+        </div>
+        <select class="input" name="kind">
+          <option value="cliente">cliente</option>
+          <option value="proveedor">proveedor</option>
+        </select>
+        <button class="button is-info">Guardar cliente</button>
+      </form>
+    </div>
+
+    <!-- chofer -->
+    <div class="card-glass">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Chofer</p>
+      <form id="frm-drv" class="mt-3 grid gap-2" onsubmit="return false;">
+        <input class="input" name="name" placeholder="Nombre" required>
+        <input class="input" name="phone" placeholder="Teléfono">
+        <input class="input" name="vehicle_plate" placeholder="Placas">
+        <input class="input" name="vehicle_type" placeholder="Camioneta / Moto / Bici">
+        <button class="button is-link">Guardar chofer</button>
+      </form>
+    </div>
+
+  </aside>
+
+  <!-- mapa + listado -->
+  <div class="lg:col-span-3 space-y-4">
+    <div class="card-glass p-0 overflow-hidden">
+      <div id="map"></div>
+    </div>
+    <div class="card-glass">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Entregas</p>
+        <div class="flex gap-2 text-xs">
+          <button class="chip" data-filter="">Todas</button>
+          <button class="chip" data-filter="pendiente">Pendientes</button>
+          <button class="chip" data-filter="en_ruta">En ruta</button>
+          <button class="chip" data-filter="entregado">Entregadas</button>
+          <button class="chip" data-filter="late">Con retraso</button>
+        </div>
+      </div>
+      <div id="list" class="grid gap-2"></div>
+    </div>
+  </div>
+
+</section>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+// -----------------------------------------------------------------------------
+// Mapa + monitoreo
+// -----------------------------------------------------------------------------
+const map = L.map('map').setView([18.8506, -97.0999], 12); // Orizaba
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  { maxZoom: 19, attribution: '&copy; OpenStreetMap' }).addTo(map);
+
+const markers = {}; // delivery.id -> Leaflet marker
+let currentFilter = '';
+
+function colorFor(d) {
+  if (d.status === 'entregado') return '#10b981';
+  if (d.status === 'cancelada') return '#6b7280';
+  if (d.is_late) return '#ef4444';
+  if (d.status === 'en_ruta') return '#0ea5e9';
+  return '#f59e0b';
+}
+
+function dotIcon(color) {
+  return L.divIcon({
+    className: 'del-dot',
+    html: `<div style="background:${color};width:14px;height:14px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 6px rgba(0,0,0,.5)"></div>`,
+    iconSize: [14, 14], iconAnchor: [7, 7]
+  });
+}
+
+async function api(method, url, body) {
+  const opt = { method, headers:{'Content-Type':'application/json'} };
+  if (body) opt.body = JSON.stringify(body);
+  const r = await fetch(url, opt);
+  if (!r.ok) {
+    const t = await r.text().catch(()=> '');
+    throw new Error(`HTTP ${r.status} · ${t}`);
+  }
+  return r.json().catch(()=> ({}));
+}
+
+async function loadSelects() {
+  const [drivers, custs, runs, rutas] = await Promise.all([
+    api('GET', '/api/delivery/drivers?active=1'),
+    api('GET', '/api/delivery/customers'),
+    api('GET', '/api/delivery/runs'),
+    api('GET', '/api/rutas').catch(()=> []),
+  ]);
+  const fill = (id, items, fmt) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const keep = sel.value;
+    const base = sel.querySelector('option');
+    sel.innerHTML = '';
+    sel.appendChild(base);
+    items.forEach(it => {
+      const o = document.createElement('option');
+      o.value = it.id; o.textContent = fmt(it);
+      sel.appendChild(o);
+    });
+    sel.value = keep;
+  };
+  fill('sel-driver', drivers, d => `${d.name}${d.vehicle_plate?' ('+d.vehicle_plate+')':''}`);
+  fill('sel-driver-run', drivers, d => d.name);
+  fill('sel-cust', custs, c => `${c.name} · ${c.address.slice(0,40)}`);
+  fill('sel-run', runs, r => `${r.code} · ${r.name}`);
+  fill('sel-ruta-run', rutas, r => `${r.nombre} (${r.distancia_km} km)`);
+}
+
+async function loadKpi() {
+  const k = await api('GET', '/api/delivery/kpi/today');
+  document.getElementById('k-runs').textContent = k.runs_today;
+  document.getElementById('k-total').textContent = k.deliveries_today;
+  document.getElementById('k-done').textContent = k.by_status.entregado || 0;
+  document.getElementById('k-late').textContent = k.late_count;
+}
+
+async function loadDeliveries() {
+  let url = '/api/delivery';
+  const params = [];
+  if (currentFilter === 'late') params.push('late_only=true');
+  else if (currentFilter) params.push('status=' + currentFilter);
+  if (params.length) url += '?' + params.join('&');
+  const list = await api('GET', url);
+
+  // mapa
+  Object.values(markers).forEach(m => map.removeLayer(m));
+  Object.keys(markers).forEach(k => delete markers[k]);
+
+  const bounds = [];
+  for (const d of list) {
+    const c = d.customer;
+    if (c && c.lat && c.lng) {
+      const m = L.marker([c.lat, c.lng], { icon: dotIcon(colorFor(d)) })
+        .addTo(map)
+        .bindPopup(`<b>${d.code}</b><br>${c.name}<br>${c.address}<br>
+                   Estado: <b>${d.is_late ? 'RETRASADO' : d.status}</b>`);
+      markers[d.id] = m;
+      bounds.push([c.lat, c.lng]);
+    }
+  }
+  if (bounds.length) {
+    try { map.fitBounds(L.latLngBounds(bounds), { padding: [40, 40] }); } catch(e){}
+  }
+
+  // lista
+  const container = document.getElementById('list');
+  container.innerHTML = '';
+  if (!list.length) {
+    container.innerHTML = '<div class="text-slate-500 text-xs">Sin entregas.</div>';
+    return;
+  }
+  list.forEach(d => {
+    const chip = d.status === 'entregado' ? 'done' :
+                 d.is_late ? 'late' :
+                 d.status === 'en_ruta' ? 'on' : '';
+    const div = document.createElement('div');
+    div.className = 'card-min';
+    div.innerHTML = `
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <div class="text-sm font-semibold">${d.code} · ${d.customer?.name || ''}</div>
+          <div class="text-xs text-slate-400">${d.customer?.address || ''}</div>
+          <div class="text-xs mt-1">
+            <span class="chip ${chip}">${d.is_late ? 'RETRASADO' : d.status}</span>
+            ${d.product_summary ? `· ${d.product_summary}` : ''}
+            ${d.scheduled_at ? `· prog. ${d.scheduled_at.replace('T', ' ').slice(0,16)}` : ''}
+          </div>
+        </div>
+        <div class="flex flex-col gap-1">
+          <button class="button is-small is-link"  data-id="${d.id}" data-s="en_ruta">En ruta</button>
+          <button class="button is-small is-success" data-id="${d.id}" data-s="entregado">Entregar</button>
+          <button class="button is-small is-danger"  data-id="${d.id}" data-s="fallida">Fallida</button>
+        </div>
+      </div>`;
+    div.querySelectorAll('button').forEach(b => b.addEventListener('click', async () => {
+      const body = { status: b.dataset.s };
+      if (b.dataset.s === 'entregado') {
+        body.message = prompt('Mensaje de entrega (opcional):', '') || null;
+        body.report = prompt('Reporte cierre (opcional):', '') || null;
+      }
+      if (b.dataset.s === 'fallida') {
+        body.issue_code = prompt('Código de incidencia (ausente/rechazo/cerrado):', 'ausente') || 'incidencia';
+        body.issue_detail = prompt('Detalle:', '') || null;
+      }
+      try {
+        await api('PATCH', `/api/delivery/${b.dataset.id}/status`, body);
+        await Promise.all([loadDeliveries(), loadKpi()]);
+      } catch(e) { alert(e.message); }
+    }));
+    container.appendChild(div);
+  });
+}
+
+// -----------------------------------------------------------------------------
+// Formularios
+// -----------------------------------------------------------------------------
+function readForm(frm) {
+  const fd = new FormData(frm);
+  const o = {};
+  for (const [k, v] of fd.entries()) {
+    if (v === '' || v === null) continue;
+    if (['lat','lng','amount'].includes(k)) o[k] = parseFloat(v);
+    else if (['stop_order','driver_id','run_id','customer_id','ruta_id','active'].includes(k)) o[k] = parseInt(v);
+    else o[k] = v;
+  }
+  return o;
+}
+
+document.querySelectorAll('.chip[data-filter]').forEach(b => b.addEventListener('click', () => {
+  currentFilter = b.dataset.filter;
+  document.querySelectorAll('.chip[data-filter]').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  loadDeliveries();
+}));
+
+document.getElementById('frm-drv').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('POST', '/api/delivery/drivers', readForm(e.target)); e.target.reset(); loadSelects(); }
+  catch(err){ alert(err.message); }
+});
+document.getElementById('frm-cust').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('POST', '/api/delivery/customers', readForm(e.target)); e.target.reset(); loadSelects(); }
+  catch(err){ alert(err.message); }
+});
+document.getElementById('frm-run').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('POST', '/api/delivery/runs', readForm(e.target)); e.target.reset(); loadSelects(); loadKpi(); }
+  catch(err){ alert(err.message); }
+});
+document.getElementById('frm-del').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('POST', '/api/delivery', readForm(e.target)); e.target.reset(); loadDeliveries(); loadKpi(); }
+  catch(err){ alert(err.message); }
+});
+
+// bind botones al click
+document.querySelector('.chip[data-filter=""]').classList.add('on');
+
+(async () => {
+  await loadSelects();
+  await loadDeliveries();
+  // refresh automático cada 30 s
+  setInterval(loadDeliveries, 30000);
+  setInterval(loadKpi, 60000);
+})();
+</script>
+{% endblock %}

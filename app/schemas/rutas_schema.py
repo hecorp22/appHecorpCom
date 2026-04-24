@@ -1,3 +1,4 @@
+from datetime import datetime
 from pydantic import BaseModel, Field
 from typing import Any, Optional
 
@@ -35,6 +36,8 @@ class RutaOut(BaseModel):
     duracion_min: int
     geojson: Any
     notas: Optional[str]
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True

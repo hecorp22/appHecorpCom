@@ -10,8 +10,7 @@ class Ruta(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     nombre = Column(String(200), nullable=False)
-    user_id = Column(String(100), index=True, nullable=False)   # ajusta a tu tipo real (int si usas ids numéricos)
-    owner_id = Column(String(100), nullable=False)      # 👈 nuevo
+    user_id = Column(String(100), index=True, nullable=False)   # email del creador
     origen_lat = Column(Float, nullable=False)
     origen_lng = Column(Float, nullable=False)
     destino_lat = Column(Float, nullable=False)
