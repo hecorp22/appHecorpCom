@@ -1,0 +1,241 @@
+{% extends "base.html" %}
+{% block title %}Cobranza{% endblock %}
+{% block page_title %}Cobranza · Cuentas por cobrar{% endblock %}
+{% block extra_css %}
+<style>
+  .kpi { background: linear-gradient(135deg, rgba(19,164,181,.18), rgba(10,110,122,.28));
+         border:1px solid rgba(19,164,181,.35); }
+  .kpi-amber { background: linear-gradient(135deg, rgba(185,139,58,.15), rgba(185,139,58,.35));
+               border:1px solid rgba(227,196,146,.45); }
+  .kpi-red { background: linear-gradient(135deg, rgba(239,68,68,.15), rgba(220,38,38,.35));
+             border:1px solid rgba(239,68,68,.45); }
+  .kpi-green { background: linear-gradient(135deg, rgba(16,185,129,.15), rgba(5,150,105,.35));
+               border:1px solid rgba(16,185,129,.45); }
+  table.cxc th { font-size:11px; text-transform:uppercase; letter-spacing:.1em;
+                 color:#94a3b8; text-align:left; padding:6px 8px; border-bottom:1px solid #1e293b; }
+  table.cxc td { padding:8px; border-bottom:1px solid #1e293b; font-size:13px; vertical-align: top; }
+  .row-vencida { background: rgba(239,68,68,.10); }
+  .row-pagada  { background: rgba(16,185,129,.10); opacity:.7; }
+  .row-parcial { background: rgba(245,158,11,.10); }
+  .badge { display:inline-block; padding:2px 8px; border-radius:999px; font-size:11px; }
+  .b-pendiente { background:#1e293b; color:#cbd5e1; }
+  .b-parcial   { background:#7c2d12; color:#fdba74; }
+  .b-vencida   { background:#7f1d1d; color:#fca5a5; }
+  .b-pagada    { background:#064e3b; color:#6ee7b7; }
+  .b-cancelada { background:#334155; color:#94a3b8; }
+</style>
+{% endblock %}
+{% block content %}
+
+<section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+  <div class="kpi-amber p-4 rounded-xl">
+    <p class="text-xs uppercase tracking-widest text-amber-200">Por cobrar</p>
+    <p class="text-2xl font-bold mt-1" id="k-out">${{ "%.2f"|format(kpi.outstanding) }}</p>
+  </div>
+  <div class="kpi-red p-4 rounded-xl">
+    <p class="text-xs uppercase tracking-widest text-red-200">Vencidas</p>
+    <p class="text-2xl font-bold mt-1" id="k-overdue">{{ kpi.overdue_count }}</p>
+  </div>
+  <div class="kpi-green p-4 rounded-xl">
+    <p class="text-xs uppercase tracking-widest text-emerald-200">Cobrado mes</p>
+    <p class="text-2xl font-bold mt-1" id="k-paid">${{ "%.2f"|format(kpi.paid_month) }}</p>
+  </div>
+  <div class="kpi p-4 rounded-xl">
+    <p class="text-xs uppercase tracking-widest text-cyan-300">CXC abiertas</p>
+    <p class="text-2xl font-bold mt-1" id="k-open">
+      {{ (kpi.by_status.get('pendiente',{}).get('count',0)
+          + kpi.by_status.get('parcial',{}).get('count',0)
+          + kpi.by_status.get('vencida',{}).get('count',0)) }}
+    </p>
+  </div>
+</section>
+
+<section class="grid lg:grid-cols-3 gap-6 mt-6">
+
+  <aside class="space-y-4">
+    <div class="card-glass">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Nueva CXC manual</p>
+      <form id="frm-cxc" class="mt-3 grid gap-2" onsubmit="return false;">
+        <input class="input" name="customer_name" placeholder="Cliente" required>
+        <div class="grid grid-cols-2 gap-2">
+          <input class="input" name="customer_phone" placeholder="Tel +52...">
+          <input class="input" name="customer_email" placeholder="email">
+        </div>
+        <input class="input" name="due_date" type="datetime-local" required>
+        <div class="grid grid-cols-3 gap-2">
+          <input class="input" name="subtotal" type="number" step="0.01" placeholder="Subtotal" required>
+          <input class="input" name="tax" type="number" step="0.01" value="0" placeholder="IVA">
+          <input class="input" name="total" type="number" step="0.01" placeholder="Total" required>
+        </div>
+        <textarea class="textarea bg-slate-900 text-slate-100" name="notes" placeholder="Notas"></textarea>
+        <button class="button is-warning">Crear CXC</button>
+      </form>
+    </div>
+
+    <div class="card-glass">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Generar desde entrega</p>
+      <form id="frm-from-del" class="mt-3 grid gap-2" onsubmit="return false;">
+        <input class="input" name="delivery_id" type="number" placeholder="ID de entrega" required>
+        <div class="grid grid-cols-2 gap-2">
+          <input class="input" name="due_days" type="number" value="7" placeholder="Vence en (días)">
+          <input class="input" name="tax_pct" type="number" step="0.01" value="0" placeholder="% IVA">
+        </div>
+        <input class="input" name="notes" placeholder="Notas">
+        <button class="button is-info">Generar CXC</button>
+      </form>
+    </div>
+
+    <div class="card-glass">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Disparar recordatorios ahora</p>
+      <p class="text-xs text-slate-400 mt-1">El cron lo hace cada hora; este botón los manda al instante.</p>
+      <button class="button is-dark mt-2 is-fullwidth" id="btn-remind">Enviar recordatorios</button>
+      <pre id="rem-result" class="text-xs text-slate-300 whitespace-pre-wrap mt-2"></pre>
+    </div>
+  </aside>
+
+  <div class="lg:col-span-2 space-y-4">
+    <div class="card-glass">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">CXC</p>
+        <div class="flex gap-2 text-xs">
+          <button class="badge b-pendiente" data-f="">Todas</button>
+          <button class="badge b-pendiente" data-f="pendiente">Pendientes</button>
+          <button class="badge b-parcial"   data-f="parcial">Parciales</button>
+          <button class="badge b-vencida"   data-f="vencida">Vencidas</button>
+          <button class="badge b-pagada"    data-f="pagada">Pagadas</button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="cxc w-full">
+          <thead>
+            <tr><th>Folio</th><th>Cliente</th><th>Vence</th><th>Total</th><th>Pagado</th><th>Saldo</th><th>Status</th><th></th></tr>
+          </thead>
+          <tbody id="tbl-cxc"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+let curFilter = '';
+
+async function api(method, url, body) {
+  const opt = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opt.body = JSON.stringify(body);
+  const r = await fetch(url, opt);
+  if (!r.ok) {
+    const t = await r.text().catch(()=>'');
+    throw new Error(`HTTP ${r.status} · ${t.slice(0,200)}`);
+  }
+  return r.json().catch(()=> ({}));
+}
+
+function readForm(frm) {
+  const fd = new FormData(frm);
+  const o = {};
+  for (const [k, v] of fd.entries()) {
+    if (v === '' || v === null) continue;
+    if (['subtotal','tax','total','tax_pct','amount'].includes(k)) o[k] = parseFloat(v);
+    else if (['delivery_id','due_days'].includes(k)) o[k] = parseInt(v);
+    else o[k] = v;
+  }
+  return o;
+}
+
+const fmt = n => parseFloat(n||0).toLocaleString('es-MX',{style:'currency',currency:'MXN'});
+
+async function loadKpi() {
+  const k = await api('GET','/api/billing/kpi');
+  document.getElementById('k-out').textContent = fmt(k.outstanding);
+  document.getElementById('k-paid').textContent = fmt(k.paid_month);
+  document.getElementById('k-overdue').textContent = k.overdue_count;
+  const open = (k.by_status.pendiente?.count||0) + (k.by_status.parcial?.count||0) + (k.by_status.vencida?.count||0);
+  document.getElementById('k-open').textContent = open;
+}
+
+async function loadList() {
+  let url = '/api/billing/invoices';
+  if (curFilter) url += '?status=' + curFilter;
+  const items = await api('GET', url);
+  const tb = document.getElementById('tbl-cxc');
+  tb.innerHTML = '';
+  if (!items.length) {
+    tb.innerHTML = '<tr><td colspan="8" class="text-slate-500 text-xs">Sin CXC.</td></tr>';
+    return;
+  }
+  items.forEach(inv => {
+    const tr = document.createElement('tr');
+    tr.className = 'row-' + inv.status;
+    const due = inv.due_date.replace('T',' ').slice(0,16);
+    const overdue = inv.days_overdue ? ` <span class="text-red-400 text-xs">(${inv.days_overdue}d)</span>` : '';
+    tr.innerHTML = `
+      <td class="font-mono">${inv.code}</td>
+      <td>${inv.customer_name}<br><span class="text-xs text-slate-500">${inv.source_code||'manual'}</span></td>
+      <td>${due}${overdue}</td>
+      <td>${fmt(inv.total)}</td>
+      <td>${fmt(inv.paid)}</td>
+      <td class="font-bold">${fmt(inv.balance)}</td>
+      <td><span class="badge b-${inv.status}">${inv.status}</span></td>
+      <td>
+        ${inv.status!=='pagada' && inv.status!=='cancelada' ?
+          `<button class="text-emerald-400 text-xs" data-pay="${inv.id}" data-bal="${inv.balance}">+ pago</button>` : ''}
+        ${inv.status!=='pagada' && inv.status!=='cancelada' ?
+          `<button class="text-red-400 text-xs ml-2" data-cancel="${inv.id}">cancelar</button>` : ''}
+      </td>`;
+    const payBtn = tr.querySelector('[data-pay]');
+    if (payBtn) payBtn.addEventListener('click', async () => {
+      const amt = prompt(`Monto a pagar (saldo ${payBtn.dataset.bal}):`, payBtn.dataset.bal);
+      if (!amt) return;
+      const method = prompt('Método (efectivo/transferencia/tarjeta/cheque/otro):', 'efectivo') || 'efectivo';
+      const ref = prompt('Referencia (opcional):', '') || null;
+      try {
+        await api('POST', `/api/billing/invoices/${payBtn.dataset.pay}/payments`,
+          { amount: parseFloat(amt), method, reference: ref });
+        await Promise.all([loadList(), loadKpi()]);
+      } catch(e){ alert(e.message); }
+    });
+    const cancelBtn = tr.querySelector('[data-cancel]');
+    if (cancelBtn) cancelBtn.addEventListener('click', async () => {
+      if (!confirm('¿Cancelar esta CXC?')) return;
+      try { await api('POST', `/api/billing/invoices/${cancelBtn.dataset.cancel}/cancel`);
+        loadList(); loadKpi(); } catch(e){ alert(e.message); }
+    });
+    tb.appendChild(tr);
+  });
+}
+
+document.querySelectorAll('[data-f]').forEach(b => b.addEventListener('click', () => {
+  curFilter = b.dataset.f; loadList();
+}));
+
+document.getElementById('frm-cxc').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('POST', '/api/billing/invoices', readForm(e.target));
+    e.target.reset(); loadList(); loadKpi(); } catch(err){ alert(err.message); }
+});
+document.getElementById('frm-from-del').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('POST', '/api/billing/invoices/from-delivery', readForm(e.target));
+    e.target.reset(); loadList(); loadKpi(); } catch(err){ alert(err.message); }
+});
+document.getElementById('btn-remind').addEventListener('click', async () => {
+  const res = document.getElementById('rem-result');
+  res.textContent = 'Disparando…';
+  try {
+    // este botón también funciona para admin (no requiere token)
+    // pero el endpoint público requiere CRON_TOKEN, así que llamamos al cron interno via /admin
+    const r = await fetch('/api/billing/cron/reminders', {
+      method:'POST', headers:{'X-Cron-Token': prompt('Pega el CRON_TOKEN (lo encuentras en .env):','')}
+    });
+    const j = await r.json();
+    res.textContent = JSON.stringify(j, null, 2);
+  } catch(e){ res.textContent = '❌ ' + e.message; }
+});
+
+loadList(); setInterval(loadKpi, 60000);
+</script>
+{% endblock %}
