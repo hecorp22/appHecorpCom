@@ -173,6 +173,16 @@ def api_run_delete(run_id: int,
     return {"ok": True}
 
 
+@api.post("/runs/{run_id}/optimize")
+def api_run_optimize(run_id: int,
+                     start_lat: Optional[float] = Body(None, embed=True),
+                     start_lng: Optional[float] = Body(None, embed=True),
+                     db: Session = Depends(get_db),
+                     _=Depends(get_current_user_from_cookie)):
+    """Reordena las paradas del run minimizando km totales (TSP NN+2-opt)."""
+    return svc.optimize_run(db, run_id, start_lat=start_lat, start_lng=start_lng)
+
+
 # ---- deliveries ----
 @api.get("", response_model=list[DeliveryOut])
 def api_deliveries(run_id: Optional[int] = None,

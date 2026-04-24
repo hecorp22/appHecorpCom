@@ -58,6 +58,19 @@
       </form>
     </div>
 
+    <!-- optimizar jornada -->
+    <div class="card-glass">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">🔀 Optimizar orden de entregas</p>
+      <p class="text-xs text-slate-400 mt-1">Algoritmo TSP (NN + 2-opt) reordena las paradas para minimizar km totales.</p>
+      <div class="mt-3 grid gap-2">
+        <select class="input" id="sel-run-opt"><option value="">— Selecciona jornada —</option></select>
+        <p class="text-[11px] text-slate-500">Punto de arranque (opc): lat,lng — si vacío, usa la 1ª parada</p>
+        <input class="input" id="opt-start" placeholder="18.8506,-97.0999">
+        <button class="button is-warning" id="btn-optimize">Optimizar</button>
+        <pre id="opt-result" class="text-xs text-slate-300 whitespace-pre-wrap"></pre>
+      </div>
+    </div>
+
     <!-- crear entrega -->
     <div class="card-glass">
       <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Nueva entrega</p>
@@ -228,6 +241,7 @@ async function loadSelects() {
   fill('sel-driver-run', drivers, d => d.name);
   fill('sel-cust', custs, c => `${c.name} · ${c.address.slice(0,40)}`);
   fill('sel-run', runs, r => `${r.code} · ${r.name}`);
+  fill('sel-run-opt', runs, r => `${r.code} · ${r.name}`);
   fill('sel-ruta-run', rutas, r => `${r.nombre} (${r.distancia_km} km)`);
 }
 
@@ -363,6 +377,35 @@ document.getElementById('frm-del').addEventListener('submit', async (e) => {
 
 // bind botones al click
 document.querySelector('.chip[data-filter=""]').classList.add('on');
+
+// Optimizar jornada
+document.getElementById('btn-optimize').addEventListener('click', async () => {
+  const runId = document.getElementById('sel-run-opt').value;
+  if (!runId) return alert('Selecciona una jornada.');
+  const res = document.getElementById('opt-result');
+  res.textContent = 'Optimizando…';
+  const startStr = (document.getElementById('opt-start').value || '').trim();
+  const body = {};
+  if (startStr) {
+    const p = startStr.split(',').map(s => parseFloat(s.trim()));
+    if (p.length === 2 && !isNaN(p[0]) && !isNaN(p[1])) {
+      body.start_lat = p[0]; body.start_lng = p[1];
+    }
+  }
+  try {
+    const r = await api('POST', `/api/delivery/runs/${runId}/optimize`, body);
+    res.textContent =
+      `✅ ${r.run_code} — ${r.stops} paradas\n` +
+      `Antes: ${r.km_before} km → Ahora: ${r.km_after} km\n` +
+      `Ahorro: ${r.saving_km} km (${r.saving_pct}%)` +
+      (r.unmapped ? `\nSin lat/lng al final: ${r.unmapped}` : '') +
+      `\n\nNuevo orden:\n` +
+      r.new_order.map(o => `  ${o.stop_order}. ${o.code} · ${o.customer || '—'}`).join('\n');
+    await loadDeliveries();
+  } catch (e) {
+    res.textContent = '❌ ' + e.message;
+  }
+});
 
 (async () => {
   await loadSelects();

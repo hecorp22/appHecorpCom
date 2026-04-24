@@ -2,12 +2,13 @@
 Servicio de entregas (delivery) — víveres/tortillas/paquetes.
 Genera códigos, controla estado, detecta retrasos, notifica admin.
 """
+import math
 import os
 import secrets
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Tuple
 
 from fastapi import HTTPException, UploadFile
 from sqlalchemy.orm import Session
@@ -391,6 +392,143 @@ def delete_delivery(db: Session, did: int) -> None:
 # --------------------------------------------------------------------------- #
 # KPI / dashboard
 # --------------------------------------------------------------------------- #
+# --------------------------------------------------------------------------- #
+# Optimización TSP (nearest-neighbor + 2-opt)
+# --------------------------------------------------------------------------- #
+def _haversine_km(a: Tuple[float, float], b: Tuple[float, float]) -> float:
+    """Distancia gran-círculo en km entre (lat, lng)."""
+    R = 6371.0
+    lat1, lon1 = math.radians(a[0]), math.radians(a[1])
+    lat2, lon2 = math.radians(b[0]), math.radians(b[1])
+    dlat = lat2 - lat1
+    dlon = lon2 - lon1
+    h = (math.sin(dlat / 2) ** 2
+         + math.cos(lat1) * math.cos(lat2) * math.sin(dlon / 2) ** 2)
+    return 2 * R * math.asin(math.sqrt(h))
+
+
+def _route_distance(points: List[Tuple[float, float]]) -> float:
+    return sum(_haversine_km(points[i], points[i + 1]) for i in range(len(points) - 1))
+
+
+def _nearest_neighbor(start: Tuple[float, float],
+                      stops: List[Tuple[float, float]]) -> List[int]:
+    """Devuelve los índices de stops visitados en orden NN desde start."""
+    remaining = list(range(len(stops)))
+    order: List[int] = []
+    cur = start
+    while remaining:
+        # índice del más cercano
+        nxt = min(remaining, key=lambda i: _haversine_km(cur, stops[i]))
+        order.append(nxt)
+        cur = stops[nxt]
+        remaining.remove(nxt)
+    return order
+
+
+def _two_opt(start: Tuple[float, float],
+             stops: List[Tuple[float, float]],
+             order: List[int],
+             max_passes: int = 50) -> List[int]:
+    """Mejora el orden con 2-opt. Eficiente para n<=80."""
+    n = len(order)
+    if n < 4:
+        return order
+
+    def total(o: List[int]) -> float:
+        pts = [start] + [stops[i] for i in o]
+        return _route_distance(pts)
+
+    best = list(order)
+    best_d = total(best)
+    improved = True
+    passes = 0
+    while improved and passes < max_passes:
+        improved = False
+        passes += 1
+        for i in range(0, n - 1):
+            for k in range(i + 1, n):
+                new = best[:i] + best[i:k + 1][::-1] + best[k + 1:]
+                d = total(new)
+                if d + 1e-9 < best_d:
+                    best, best_d = new, d
+                    improved = True
+    return best
+
+
+def optimize_run(db: Session, run_id: int,
+                 start_lat: Optional[float] = None,
+                 start_lng: Optional[float] = None) -> Dict[str, Any]:
+    """
+    Reordena las entregas de un run minimizando km totales.
+    - Solo considera entregas con lat/lng definidos en su cliente.
+    - Conserva el orden de las que NO tienen lat/lng al final.
+    - Si no se da start, usa el lat/lng del primer cliente como punto de arranque.
+    """
+    run = get_run(db, run_id)
+    deliveries = (db.query(Delivery)
+                  .filter(Delivery.run_id == run_id)
+                  .order_by(Delivery.stop_order, Delivery.id).all())
+    if not deliveries:
+        raise HTTPException(400, "La jornada no tiene entregas")
+
+    # separa con/sin coordenadas
+    geo: List[Delivery] = []
+    no_geo: List[Delivery] = []
+    for d in deliveries:
+        c = d.customer
+        if c and c.lat is not None and c.lng is not None:
+            geo.append(d)
+        else:
+            no_geo.append(d)
+
+    if len(geo) < 2:
+        raise HTTPException(400, "Se requieren al menos 2 entregas con lat/lng para optimizar")
+
+    stops = [(d.customer.lat, d.customer.lng) for d in geo]
+    if start_lat is not None and start_lng is not None:
+        start = (start_lat, start_lng)
+    else:
+        start = stops[0]   # arranca desde la 1a parada
+
+    # métrica original
+    original_pts = [start] + stops  # respetando el orden actual
+    km_before = _route_distance(original_pts)
+
+    # NN -> 2-opt
+    nn_order = _nearest_neighbor(start, stops)
+    best_order = _two_opt(start, stops, nn_order)
+
+    optimized_pts = [start] + [stops[i] for i in best_order]
+    km_after = _route_distance(optimized_pts)
+
+    # aplica nuevos stop_order (1..N para los geo, luego no_geo al final)
+    for new_pos, idx in enumerate(best_order, start=1):
+        geo[idx].stop_order = new_pos
+    for offset, d in enumerate(no_geo, start=1):
+        d.stop_order = len(best_order) + offset
+    db.commit()
+
+    saving_km = round(km_before - km_after, 2)
+    saving_pct = round((saving_km / km_before * 100) if km_before > 0 else 0, 1)
+
+    return {
+        "run_id": run_id,
+        "run_code": run.code,
+        "stops": len(geo),
+        "unmapped": len(no_geo),
+        "km_before": round(km_before, 2),
+        "km_after": round(km_after, 2),
+        "saving_km": saving_km,
+        "saving_pct": saving_pct,
+        "new_order": [
+            {"stop_order": d.stop_order, "id": d.id, "code": d.code,
+             "customer": d.customer.name if d.customer else None}
+            for d in sorted(geo + no_geo, key=lambda x: x.stop_order)
+        ],
+    }
+
+
 def kpi_today(db: Session) -> Dict[str, Any]:
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     tomorrow = today + timedelta(days=1)
