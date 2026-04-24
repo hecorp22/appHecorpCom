@@ -12,6 +12,7 @@ from app.repos.client_repo import ClientRepo
 from app.repos.order_repo import OrderRepo
 from app.schemas.shipment_schema import ShipmentCreate
 from app.services.sms_service import send_sms, build_shipment_sms
+from app.services.admin_notify import notify_shipment_created
 
 UPLOAD_DIR = Path("app/static/uploads/shipments")
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
@@ -67,6 +68,11 @@ class ShipmentService:
             notes=data.notes,
         )
         ship = self.repo.add(ship)
+
+        try:
+            notify_shipment_created(ship)
+        except Exception:
+            pass
 
         if data.send_sms and ship.recipient_phone:
             self.send_notification(ship)

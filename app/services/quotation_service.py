@@ -7,6 +7,7 @@ from app.repos.quotation_repo import QuotationRepo
 from app.schemas.quotation_schema import QuotationCreate
 from app.core.audit import audit
 from app.core.context import ctx_process_type
+from app.services.admin_notify import notify_quotation_created
 
 TWOPLACES = Decimal("0.01")
 
@@ -86,6 +87,10 @@ class QuotationService:
                 "quote_code": saved.quote_code,
                 "total": float(saved.total),
             })
+        except Exception:
+            pass
+        try:
+            notify_quotation_created(saved)
         except Exception:
             pass
         return saved

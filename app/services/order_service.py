@@ -7,6 +7,7 @@ from app.repos.client_repo import ClientRepo
 from app.schemas.order_schema import OrderCreate, ITEM_TYPES
 from app.core.audit import audit
 from app.core.context import ctx_process_type
+from app.services.admin_notify import notify_order_created
 
 
 class OrderService:
@@ -88,6 +89,10 @@ class OrderService:
                 "client_id": saved.client_id,
                 "items": len(saved.items),
             })
+        except Exception:
+            pass
+        try:
+            notify_order_created(saved)
         except Exception:
             pass
         return saved

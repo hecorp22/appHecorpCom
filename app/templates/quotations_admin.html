@@ -199,6 +199,7 @@
         </div>
         <div class="mt-2 flex flex-wrap gap-2">
           <a href="/quotations/${q.id}/pdf" target="_blank" class="button is-small is-warning">⬇ PDF</a>
+          <button data-id="${q.id}" data-to="${q.email || ''}" data-code="${q.quote_code}" class="btn-mail button is-small is-info">✉ Enviar por correo</button>
           <button data-id="${q.id}" data-s="enviada"   class="btn-s button is-small is-link">Marcar enviada</button>
           <button data-id="${q.id}" data-s="aceptada"  class="btn-s button is-small is-success">Aceptada</button>
           <button data-id="${q.id}" data-s="rechazada" class="btn-s button is-small is-danger">Rechazada</button>
@@ -210,6 +211,23 @@
       const fd = new FormData(); fd.append('status', b.dataset.s);
       await fetch(`/quotations/${b.dataset.id}/status`, { method:'PATCH', credentials:'same-origin', body: fd });
       loadList();
+    }));
+    list.querySelectorAll('.btn-mail').forEach(b => b.addEventListener('click', async () => {
+      const def = b.dataset.to || '';
+      const to = prompt(`Enviar ${b.dataset.code} a qué correo?`, def);
+      if (!to) return;
+      const msg = prompt('Mensaje adicional (opcional):', '') || '';
+      b.disabled = true; b.textContent = 'Enviando...';
+      try{
+        const r = await fetch(`/quotations/${b.dataset.id}/email`, {
+          method:'POST', credentials:'same-origin',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ to, message: msg })
+        });
+        const data = await r.json().catch(()=>({}));
+        if (!r.ok) { alert('Error: ' + (data.detail || r.status)); }
+        else { alert('Enviado ✓ · ' + (data.message_id || 'ok')); }
+      } finally { b.disabled = false; b.textContent = '✉ Enviar por correo'; }
     }));
     list.querySelectorAll('.btn-del').forEach(b => b.addEventListener('click', async () => {
       if (!confirm('¿Eliminar cotización?')) return;
