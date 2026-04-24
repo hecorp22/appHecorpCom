@@ -1,0 +1,17 @@
+{
+  "name": "HECORP · Reparto",
+  "short_name": "HECORP Reparto",
+  "description": "App del chofer para monitoreo de rutas de entrega",
+  "start_url": "./",
+  "scope": "/driver/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0b1422",
+  "theme_color": "#0e7490",
+  "lang": "es-MX",
+  "icons": [
+    { "src": "/static/driver-pwa/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/static/driver-pwa/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/static/driver-pwa/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

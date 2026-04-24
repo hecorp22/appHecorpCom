@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <meta name="theme-color" content="#0e7490">
+<link rel="manifest" href="/static/driver-pwa/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/static/driver-pwa/icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HECORP Reparto">
 <title>HECORP · Ruta {{ drv.name }}</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
@@ -39,8 +44,13 @@
     <p class="text-xs text-slate-400">GPS</p>
     <p class="font-bold gps-off" id="gps">desconectado</p>
     <button class="text-xs underline mt-1" id="btnGps">activar</button>
+    <p class="text-[10px] mt-1" id="net">• online</p>
   </div>
 </header>
+
+<button id="btnInstall" class="hidden w-full pad p-2 mb-2 text-sm text-cyan-300">
+  📥 Instalar como app
+</button>
 
 <section class="pad p-3 mb-3 text-xs text-slate-400" id="bar">
   Cargando...
@@ -85,6 +95,43 @@
 
 <script>
 const TOKEN = "{{ token }}";
+
+// ---- Service worker / instalable ----
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js', { scope: '/' })
+    .then(reg => console.log('SW registrado', reg.scope))
+    .catch(e => console.warn('SW err', e));
+}
+let deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault(); deferredPrompt = e;
+  document.getElementById('btnInstall').classList.remove('hidden');
+});
+document.getElementById('btnInstall').addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  await deferredPrompt.userChoice;
+  deferredPrompt = null;
+  document.getElementById('btnInstall').classList.add('hidden');
+});
+
+// ---- estado de red ----
+const netEl = document.getElementById('net');
+function updateNet() {
+  if (navigator.onLine) {
+    netEl.textContent = '• online';
+    netEl.className = 'text-[10px] mt-1 text-emerald-400';
+    if (navigator.serviceWorker?.controller) {
+      navigator.serviceWorker.controller.postMessage('drain-queue');
+    }
+  } else {
+    netEl.textContent = '• offline (cache)';
+    netEl.className = 'text-[10px] mt-1 text-amber-400';
+  }
+}
+window.addEventListener('online', updateNet);
+window.addEventListener('offline', updateNet);
+updateNet();
 
 // ---- helpers ----
 async function api(method, url, body, isForm=false) {

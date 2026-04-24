@@ -42,6 +42,23 @@ def delivery_dashboard(request: Request,
     )
 
 
+@html.get("/sw.js", include_in_schema=False)
+def driver_sw():
+    """Sirve el service worker en la raíz para que pueda controlar /driver/* y /api/*."""
+    from pathlib import Path as _P
+    sw = _P("app/static/driver-pwa/sw.js")
+    if not sw.exists():
+        raise HTTPException(404, "sw.js no encontrado")
+    return Response(
+        content=sw.read_bytes(),
+        media_type="application/javascript",
+        headers={
+            "Service-Worker-Allowed": "/",
+            "Cache-Control": "no-cache",
+        },
+    )
+
+
 @html.get("/track/d/{code}", response_class=HTMLResponse)
 def public_track_delivery(code: str, request: Request, db: Session = Depends(get_db)):
     d = db.query(svc.Delivery).filter_by(code=code.strip()).first()
