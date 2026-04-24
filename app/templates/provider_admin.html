@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}Proveedores{% endblock %}
+{% block page_title %}Administración de Proveedores{% endblock %}
+
+{% block content %}
+<div class="grid xl:grid-cols-2 gap-6">
+  <div class="card-glass">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Agregar Proveedor</p>
+    <form id="providerForm" class="mt-4 space-y-3" novalidate>
+
+      <div class="field">
+        <label class="label text-slate-300 text-xs" for="pv-name">Nombre *</label>
+        <input id="pv-name" class="input" type="text" name="name"
+               placeholder="Ej. Distribuidora ABC"
+               required minlength="2" maxlength="120"
+               autocomplete="organization">
+      </div>
+
+      <div class="field">
+        <label class="label text-slate-300 text-xs" for="pv-contact">Contacto *</label>
+        <input id="pv-contact" class="input" type="text" name="contact"
+               placeholder="Ej. Juan Pérez"
+               required minlength="2" maxlength="120"
+               autocomplete="name">
+      </div>
+
+      <div class="field">
+        <label class="label text-slate-300 text-xs" for="pv-email">Email *</label>
+        <input id="pv-email" class="input" type="email" name="email"
+               placeholder="Ej. contacto@proveedor.com"
+               required maxlength="120"
+               autocomplete="email">
+      </div>
+
+      <div class="field">
+        <label class="label text-slate-300 text-xs" for="pv-phone">Teléfono *</label>
+        <input id="pv-phone" class="input" type="tel" name="phone"
+               placeholder="Ej. 5512345678"
+               required pattern="\d{10}" maxlength="10" minlength="10"
+               inputmode="numeric" autocomplete="tel">
+      </div>
+
+      <div class="field">
+        <label class="label text-slate-300 text-xs" for="pv-address">Dirección *</label>
+        <input id="pv-address" class="input" type="text" name="address"
+               placeholder="Ej. Calle Falsa 123, Col. Centro"
+               required minlength="3" maxlength="255"
+               autocomplete="street-address">
+      </div>
+
+      <button type="submit" class="button is-link is-fullwidth">Agregar Proveedor</button>
+    </form>
+    <div id="providerResponse" class="mt-4 text-xs"></div>
+  </div>
+
+  <div class="card-glass">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Proveedores existentes</p>
+    <div id="providerList" class="mt-4 space-y-3"></div>
+  </div>
+</div>
+
+<!-- Modal cuentas -->
+<div id="accModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+  <div class="bg-slate-900 border border-slate-700 rounded-2xl p-5 w-full max-w-xl">
+    <div class="flex justify-between items-center mb-3">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Cuentas de <span id="accProviderName"></span></p>
+      <button id="accClose" class="text-slate-400 hover:text-white">×</button>
+    </div>
+    <div id="accList" class="space-y-2 text-sm text-slate-300 max-h-64 overflow-auto"></div>
+    <form id="accForm" class="mt-4 grid grid-cols-1 md:grid-cols-2 gap-2">
+      <input name="bank_name" class="input is-small" placeholder="Banco *" required maxlength="120">
+      <input name="account_holder" class="input is-small" placeholder="Titular *" required maxlength="160">
+      <input name="clabe" class="input is-small" placeholder="CLABE (18 dígitos)" pattern="\d{18}" maxlength="18" inputmode="numeric">
+      <input name="account_number" class="input is-small" placeholder="No. de cuenta" maxlength="30">
+      <div class="select is-small"><select name="currency">
+        <option value="MXN">MXN</option><option value="USD">USD</option><option value="EUR">EUR</option>
+      </select></div>
+      <input name="notes" class="input is-small" placeholder="Notas" maxlength="255">
+      <button type="submit" class="button is-small is-link md:col-span-2">+ Agregar cuenta</button>
+    </form>
+    <div id="accMsg" class="mt-2 text-xs"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function(){
+  const form = document.getElementById('providerForm');
+  const out  = document.getElementById('providerResponse');
+  const list = document.getElementById('providerList');
+  const modal= document.getElementById('accModal');
+  const accList = document.getElementById('accList');
+  const accForm = document.getElementById('accForm');
+  const accMsg  = document.getElementById('accMsg');
+  const accName = document.getElementById('accProviderName');
+  let currentProvider = null;
+
+  function setMsg(el,t,ok){ el.textContent=t; el.style.color = ok?'#4ade80':'#f87171'; }
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (!form.checkValidity()){ form.reportValidity(); setMsg(out,'Revisa los campos.', false); return; }
+    const payload = Object.fromEntries(new FormData(form).entries());
+    setMsg(out,'Enviando...', true);
+    try{
+      const r = await fetch('/providers/', { method:'POST', credentials:'same-origin',
+        headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+      const b = await r.json().catch(()=>({}));
+      if (!r.ok){
+        let m = b.detail || 'Error';
+        if (Array.isArray(b.detail)) m = b.detail.map(d=>`${d.loc.slice(-1)[0]}: ${d.msg}`).join(' · ');
+        throw new Error(m);
+      }
+      setMsg(out,'Proveedor agregado ✓', true);
+      form.reset(); fetchProviders();
+    }catch(err){ setMsg(out,'Error: '+err.message, false); }
+  });
+
+  async function fetchProviders(){
+    const r = await fetch('/providers/', { credentials:'same-origin' });
+    if (!r.ok) return;
+    const d = await r.json();
+    list.innerHTML = '';
+    if (!d.length){ list.innerHTML='<div class="text-slate-500 text-xs">Sin proveedores.</div>'; return; }
+    d.forEach(p => {
+      const el = document.createElement('div');
+      el.className='p-3 bg-slate-800/50 rounded-lg';
+      el.innerHTML = `
+        <div class="flex justify-between items-center">
+          <div>
+            <p class="font-semibold">${p.name}</p>
+            <p class="text-xs text-slate-400">${p.contact} · ${p.phone} · ${p.email}</p>
+          </div>
+          <button class="button is-small is-warning" data-id="${p.id}" data-name="${p.name}">Cuentas</button>
+        </div>`;
+      el.querySelector('button').addEventListener('click', () => openAccounts(p.id, p.name));
+      list.appendChild(el);
+    });
+  }
+
+  async function openAccounts(id, name){
+    currentProvider = id; accName.textContent = name;
+    modal.classList.remove('hidden'); setMsg(accMsg,'', true);
+    await loadAccounts();
+  }
+  document.getElementById('accClose').addEventListener('click', () => modal.classList.add('hidden'));
+
+  async function loadAccounts(){
+    const r = await fetch(`/providers/${currentProvider}/accounts/`, { credentials:'same-origin' });
+    if (!r.ok) return;
+    const d = await r.json();
+    accList.innerHTML = d.length ? d.map(a => `
+      <div class="flex justify-between items-center bg-slate-800/60 p-2 rounded">
+        <div>
+          <p class="font-semibold text-sm">${a.bank_name} <span class="text-[10px] text-slate-400">${a.currency}</span></p>
+          <p class="text-[11px] text-slate-400">${a.account_holder}${a.clabe?' · CLABE '+a.clabe:''}${a.account_number?' · '+a.account_number:''}</p>
+        </div>
+        <button class="text-red-400 text-xs" data-id="${a.id}">Eliminar</button>
+      </div>`).join('') : '<p class="text-slate-500 text-xs">Sin cuentas.</p>';
+
+    accList.querySelectorAll('button[data-id]').forEach(b => {
+      b.addEventListener('click', async () => {
+        if (!confirm('Eliminar cuenta?')) return;
+        await fetch(`/providers/${currentProvider}/accounts/${b.dataset.id}`, { method:'DELETE', credentials:'same-origin' });
+        loadAccounts();
+      });
+    });
+  }
+
+  accForm.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (!accForm.checkValidity()){ accForm.reportValidity(); return; }
+    const payload = Object.fromEntries(new FormData(accForm).entries());
+    if (!payload.clabe) delete payload.clabe;
+    if (!payload.account_number) delete payload.account_number;
+    if (!payload.notes) delete payload.notes;
+    const r = await fetch(`/providers/${currentProvider}/accounts/`, {
+      method:'POST', credentials:'same-origin',
+      headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload),
+    });
+    const b = await r.json().catch(()=>({}));
+    if (!r.ok){
+      let m = b.detail || 'Error'; if (Array.isArray(b.detail)) m = b.detail.map(d=>`${d.loc.slice(-1)[0]}: ${d.msg}`).join(' · ');
+      setMsg(accMsg, 'Error: '+m, false); return;
+    }
+    setMsg(accMsg, 'Cuenta agregada ✓', true);
+    accForm.reset(); loadAccounts();
+  });
+
+  fetchProviders();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block title %}Admin Panel{% endblock %}
+{% block page_title %}Panel de Administración{% endblock %}
+
+{% block content %}
+<div class="grid lg:grid-cols-2 gap-6">
+  <div class="card-glass">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Agregar Cliente</p>
+    <form id="clientForm" class="mt-4 space-y-3">
+      <input class="input" type="text" name="name" placeholder="Nombre" required>
+      <input class="input" type="text" name="phone" placeholder="Teléfono" required>
+      <input class="input" type="text" name="account_key" placeholder="Clave de Cuenta" required>
+      <input class="input" type="text" name="address" placeholder="Dirección" required>
+      <input class="input" type="text" name="state" placeholder="Estado" required>
+      <input class="input" type="text" name="country" placeholder="País" required>
+      <input class="input" type="text" name="city" placeholder="Ciudad" required>
+      <button type="submit" class="button is-link is-fullwidth">Agregar Cliente</button>
+    </form>
+    <div id="clientResponse" class="mt-4 text-xs text-slate-400"></div>
+  </div>
+  <div class="card-glass">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Agregar Proveedor</p>
+    <form id="providerForm" class="mt-4 space-y-3">
+      <input class="input" type="text" name="name" placeholder="Nombre" required>
+      <input class="input" type="text" name="contact" placeholder="Contacto" required>
+      <input class="input" type="text" name="email" placeholder="Email" required>
+      <input class="input" type="text" name="phone" placeholder="Teléfono" required>
+      <input class="input" type="text" name="address" placeholder="Dirección" required>
+      <button type="submit" class="button is-link is-fullwidth">Agregar Proveedor</button>
+    </form>
+    <div id="providerResponse" class="mt-4 text-xs text-slate-400"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+const clientForm = document.getElementById('clientForm');
+const providerForm = document.getElementById('providerForm');
+const clientResponseDiv = document.getElementById('clientResponse');
+const providerResponseDiv = document.getElementById('providerResponse');
+
+clientForm.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const data = new FormData(clientForm);
+  const payload = Object.fromEntries(data.entries());
+  clientResponseDiv.textContent = 'Enviando...';
+  try {
+    const res = await fetch('/clients', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.detail || 'Error');
+    clientResponseDiv.textContent = 'Cliente agregado ✓';
+  } catch (err) {
+    clientResponseDiv.textContent = 'Error: ' + err.message;
+  }
+});
+
+providerForm.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
+  const data = new FormData(providerForm);
+  const payload = Object.fromEntries(data.entries());
+  providerResponseDiv.textContent = 'Enviando...';
+  try {
+    const res = await fetch('/providers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.detail || 'Error');
+    providerResponseDiv.textContent = 'Proveedor agregado ✓';
+  } catch (err) {
+    providerResponseDiv.textContent = 'Error: ' + err.message;
+  }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,300 @@
+{% extends "base.html" %}
+{% block title %}Envíos{% endblock %}
+{% block page_title %}Administración de Envíos{% endblock %}
+
+{% block content %}
+<div class="grid xl:grid-cols-2 gap-6">
+  <div class="card-glass">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Nuevo Envío</p>
+
+    <form id="shipForm" class="mt-4 space-y-3" novalidate>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="s-client">Cliente *</label>
+          <div class="select w-full">
+            <select id="s-client" name="client_id" required class="w-full">
+              <option value="">Selecciona…</option>
+            </select>
+          </div>
+        </div>
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="s-order">Pedido (opcional)</label>
+          <div class="select w-full">
+            <select id="s-order" name="order_id" class="w-full">
+              <option value="">— Sin pedido —</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="s-tracking">Guía *</label>
+          <input id="s-tracking" class="input" type="text" name="tracking_code"
+                 placeholder="Ej. 1Z999AA10123456784" required minlength="3" maxlength="80">
+        </div>
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="s-carrier">Paquetería *</label>
+          <input id="s-carrier" class="input" type="text" name="carrier"
+                 placeholder="Ej. DHL, Estafeta, Paquetexpress" required minlength="2" maxlength="60" list="carriers">
+          <datalist id="carriers">
+            <option value="DHL"><option value="Estafeta"><option value="Paquetexpress">
+            <option value="FedEx"><option value="UPS"><option value="Redpack"><option value="99Minutos">
+          </datalist>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="s-recipient">Destinatario *</label>
+          <input id="s-recipient" class="input" type="text" name="recipient_name"
+                 placeholder="Ej. Juan Pérez" required minlength="2" maxlength="160">
+        </div>
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="s-phone">Teléfono destinatario (SMS)</label>
+          <input id="s-phone" class="input" type="tel" name="recipient_phone"
+                 placeholder="Ej. 5512345678" pattern="\d{10}" maxlength="10" inputmode="numeric"
+                 title="10 dígitos para recibir SMS de confirmación">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label text-slate-300 text-xs" for="s-destination">Destino *</label>
+        <input id="s-destination" class="input" type="text" name="destination"
+               placeholder="Ej. Calle Madero 45, Col. Centro" required minlength="3" maxlength="255">
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="s-city">Ciudad *</label>
+          <input id="s-city" class="input" type="text" name="city" required minlength="2" maxlength="80">
+        </div>
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="s-state">Estado *</label>
+          <input id="s-state" class="input" type="text" name="state" required minlength="2" maxlength="80">
+        </div>
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="s-country">País *</label>
+          <input id="s-country" class="input" type="text" name="country" value="México" required minlength="2" maxlength="80">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="s-ptype">Tipo producto *</label>
+          <input id="s-ptype" class="input" type="text" name="product_type"
+                 placeholder="Ej. bujes / hules / maquinados / mixto" required list="ptypes" maxlength="80">
+          <datalist id="ptypes">
+            <option value="bujes"><option value="hules"><option value="portachumaceras">
+            <option value="flechas"><option value="maquinados"><option value="mixto">
+          </datalist>
+        </div>
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="s-weight">Peso (kg)</label>
+          <input id="s-weight" class="input" type="number" name="weight_kg" step="0.001" min="0" placeholder="Ej. 12.500">
+        </div>
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="s-status">Status</label>
+          <div class="select w-full">
+            <select id="s-status" name="status" class="w-full">
+              <option value="preparando">Preparando</option>
+              <option value="en_transito">En tránsito</option>
+              <option value="entregado">Entregado</option>
+              <option value="incidencia">Incidencia</option>
+              <option value="cancelado">Cancelado</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="s-eta">Entrega estimada</label>
+          <input id="s-eta" class="input" type="date" name="estimated_delivery">
+        </div>
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="s-photos">Fotos del envío (máx 5)</label>
+          <input id="s-photos" class="input" type="file" name="photos" accept="image/*" multiple>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label text-slate-300 text-xs" for="s-notes">Notas</label>
+        <textarea id="s-notes" class="textarea" name="notes" rows="2" placeholder="Observaciones..."></textarea>
+      </div>
+
+      <label class="flex items-center gap-2 text-xs text-slate-300">
+        <input type="checkbox" id="s-sms" name="send_sms" checked>
+        Enviar SMS al destinatario al crear (requiere teléfono)
+      </label>
+
+      <button type="submit" class="button is-link is-fullwidth">Crear Envío</button>
+    </form>
+    <div id="shipMsg" class="mt-3 text-xs"></div>
+  </div>
+
+  <div class="card-glass">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Envíos existentes</p>
+    <div id="shipList" class="mt-4 space-y-2 text-sm text-slate-300"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function(){
+  const form = document.getElementById('shipForm');
+  const msg  = document.getElementById('shipMsg');
+  const list = document.getElementById('shipList');
+  const selClient = document.getElementById('s-client');
+  const selOrder  = document.getElementById('s-order');
+
+  function setMsg(t, ok){ msg.textContent = t; msg.style.color = ok ? '#4ade80' : '#f87171'; }
+
+  async function loadClients(){
+    const r = await fetch('/clients/', { credentials:'same-origin' });
+    if(!r.ok) return;
+    const d = await r.json();
+    selClient.innerHTML = '<option value="">Selecciona…</option>' +
+      d.map(c => `<option value="${c.id}" data-phone="${c.phone}" data-name="${c.name}">${c.name} — ${c.phone}</option>`).join('');
+  }
+
+  async function loadOrders(clientId){
+    const r = await fetch('/orders/', { credentials:'same-origin' });
+    if(!r.ok) return;
+    const d = await r.json();
+    const filt = clientId ? d.filter(o => o.client_id == clientId) : d;
+    selOrder.innerHTML = '<option value="">— Sin pedido —</option>' +
+      filt.map(o => `<option value="${o.id}" data-recipient="${o.recipient_name}" data-dest="${o.destination}" data-city="${o.city||''}" data-state="${o.state||''}" data-country="${o.country||'México'}">${o.order_code} · ${o.recipient_name}</option>`).join('');
+  }
+
+  selClient.addEventListener('change', () => {
+    const opt = selClient.selectedOptions[0];
+    if (opt && opt.value){
+      const phone = opt.dataset.phone || '';
+      const name  = opt.dataset.name  || '';
+      if (!document.getElementById('s-phone').value) document.getElementById('s-phone').value = phone;
+      if (!document.getElementById('s-recipient').value) document.getElementById('s-recipient').value = name;
+    }
+    loadOrders(opt && opt.value);
+  });
+
+  selOrder.addEventListener('change', () => {
+    const o = selOrder.selectedOptions[0];
+    if (!o || !o.value) return;
+    const set = (id,v) => { const el = document.getElementById(id); if(el && !el.value) el.value = v; };
+    set('s-recipient', o.dataset.recipient);
+    set('s-destination', o.dataset.dest);
+    set('s-city', o.dataset.city);
+    set('s-state', o.dataset.state);
+    set('s-country', o.dataset.country);
+  });
+
+  async function loadShipments(){
+    const r = await fetch('/shipments/', { credentials:'same-origin' });
+    if(!r.ok) return;
+    const d = await r.json();
+    list.innerHTML = '';
+    if(!d.length){ list.innerHTML = '<div class="text-slate-500 text-xs">Sin envíos aún.</div>'; return; }
+    d.forEach(s => {
+      const photos = (s.photos||[]).map(p =>
+        `<a href="${p.url}" target="_blank"><img src="${p.url}" class="w-14 h-14 object-cover rounded border border-slate-700"></a>`).join('');
+      const card = document.createElement('div');
+      card.className = 'p-3 bg-slate-800/50 rounded-lg';
+      card.innerHTML = `
+        <div class="flex justify-between items-center">
+          <div>
+            <p class="font-semibold">${s.tracking_code} <span class="text-slate-400 text-xs">· ${s.carrier}</span></p>
+            <p class="text-xs text-slate-400">${s.recipient_name} · ${s.destination}, ${s.city}, ${s.state}</p>
+          </div>
+          <span class="text-[10px] px-2 py-0.5 bg-slate-700 rounded uppercase">${s.status}</span>
+        </div>
+        <div class="text-[11px] text-slate-400 mt-1">
+          ${s.weight_kg?`Peso: ${s.weight_kg} kg · `:''}${s.product_type}
+          ${s.sms_sent?' · <span class="text-green-400">SMS ✓</span>':(s.sms_error?` · <span class="text-red-400">SMS error</span>`:'')}
+        </div>
+        <div class="mt-2 flex gap-1">${photos}</div>
+        <div class="mt-2 flex flex-wrap gap-2 text-xs">
+          <button data-id="${s.id}" class="btn-photos button is-small is-warning">+ Fotos</button>
+          <button data-id="${s.id}" class="btn-sms button is-small is-link">Reenviar SMS</button>
+        </div>`;
+      list.appendChild(card);
+    });
+
+    list.querySelectorAll('.btn-photos').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const inp = document.createElement('input');
+        inp.type = 'file'; inp.multiple = true; inp.accept='image/*';
+        inp.onchange = async () => {
+          const fd = new FormData();
+          [...inp.files].slice(0,5).forEach(f => fd.append('files', f));
+          fd.append('send_sms_flag', 'true');
+          const r = await fetch(`/shipments/${id}/photos`, { method:'POST', credentials:'same-origin', body: fd });
+          if (!r.ok){ alert('Error subiendo fotos'); return; }
+          loadShipments();
+        };
+        inp.click();
+      });
+    });
+    list.querySelectorAll('.btn-sms').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const id = btn.dataset.id;
+        const r = await fetch(`/shipments/${id}/send-sms`, { method:'POST', credentials:'same-origin' });
+        const b = await r.json().catch(()=>({}));
+        alert(b.ok ? 'SMS enviado ✓' : ('Error: ' + (b.error||'desconocido')));
+        loadShipments();
+      });
+    });
+  }
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (!form.checkValidity()){ form.reportValidity(); setMsg('Revisa los campos.', false); return; }
+
+    const fd = new FormData(form);
+    const payload = Object.fromEntries(fd.entries());
+    payload.client_id = parseInt(payload.client_id, 10);
+    payload.order_id  = payload.order_id ? parseInt(payload.order_id, 10) : null;
+    payload.weight_kg = payload.weight_kg ? parseFloat(payload.weight_kg) : null;
+    if (payload.estimated_delivery) payload.estimated_delivery = new Date(payload.estimated_delivery).toISOString();
+    else delete payload.estimated_delivery;
+    payload.send_sms = !!document.getElementById('s-sms').checked;
+    if (!payload.recipient_phone) delete payload.recipient_phone;
+
+    setMsg('Creando envío...', true);
+    try{
+      const r = await fetch('/shipments/', {
+        method:'POST', credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
+      });
+      const b = await r.json().catch(()=>({}));
+      if (!r.ok){
+        let m = b.detail || 'Error';
+        if (Array.isArray(b.detail)) m = b.detail.map(d=>`${d.loc.slice(-1)[0]}: ${d.msg}`).join(' · ');
+        throw new Error(m);
+      }
+      // Subir fotos si hay
+      const files = document.getElementById('s-photos').files;
+      if (files && files.length){
+        const fd2 = new FormData();
+        [...files].slice(0,5).forEach(f => fd2.append('files', f));
+        fd2.append('send_sms_flag', payload.send_sms ? 'true' : 'false');
+        await fetch(`/shipments/${b.id}/photos`, { method:'POST', credentials:'same-origin', body: fd2 });
+      }
+      setMsg('Envío creado ✓' + (b.sms_sent?' · SMS enviado':''), true);
+      form.reset();
+      document.getElementById('s-country').value = 'México';
+      document.getElementById('s-sms').checked = true;
+      loadShipments();
+    } catch(err){ setMsg('Error: '+err.message, false); }
+  });
+
+  loadClients();
+  loadOrders();
+  loadShipments();
+})();
+</script>
+{% endblock %}

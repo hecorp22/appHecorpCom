@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Guia {{ s.tracking_code }} · Hecorp</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { background: #0b1120; color: #e2e8f0; font-family: system-ui, -apple-system, sans-serif; }
+    .card { background: rgba(30,41,59,.55); backdrop-filter: blur(8px); border:1px solid rgba(71,85,105,.35); }
+    .chip { padding: 2px 10px; border-radius: 9999px; font-size: 11px; text-transform: uppercase; letter-spacing: .1em; }
+    .chip-preparando  { background:#334155; color:#cbd5e1; }
+    .chip-en_transito { background:#0c4a6e; color:#7dd3fc; }
+    .chip-entregado   { background:#065f46; color:#6ee7b7; }
+    .chip-incidencia  { background:#7f1d1d; color:#fca5a5; }
+    .chip-cancelado   { background:#52525b; color:#d4d4d8; }
+  </style>
+</head>
+<body class="min-h-screen p-4 md:p-8">
+  <div class="max-w-3xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Seguimiento</p>
+        <h1 class="text-2xl md:text-3xl font-semibold">Guia <span class="text-yellow-200">{{ s.tracking_code }}</span></h1>
+      </div>
+      <span class="chip chip-{{ s.status }}">{{ s.status|replace('_', ' ') }}</span>
+    </div>
+
+    <div class="card rounded-2xl p-5 space-y-4">
+      <div class="grid md:grid-cols-2 gap-4 text-sm">
+        <div>
+          <p class="text-xs text-slate-400 uppercase">Paqueteria</p>
+          <p class="font-semibold">{{ s.carrier }}</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-400 uppercase">Destinatario</p>
+          <p class="font-semibold">{{ s.recipient_name }}</p>
+        </div>
+        <div class="md:col-span-2">
+          <p class="text-xs text-slate-400 uppercase">Destino</p>
+          <p>{{ s.destination }}{% if s.city %}, {{ s.city }}{% endif %}{% if s.state %}, {{ s.state }}{% endif %}{% if s.country %}, {{ s.country }}{% endif %}</p>
+        </div>
+        <div>
+          <p class="text-xs text-slate-400 uppercase">Producto</p>
+          <p>{{ s.product_type }}</p>
+        </div>
+        {% if s.weight_kg %}
+        <div>
+          <p class="text-xs text-slate-400 uppercase">Peso</p>
+          <p>{{ '%.3f'|format(s.weight_kg|float) }} kg</p>
+        </div>
+        {% endif %}
+        {% if s.estimated_delivery %}
+        <div>
+          <p class="text-xs text-slate-400 uppercase">Entrega estimada</p>
+          <p>{{ s.estimated_delivery.strftime('%Y-%m-%d') }}</p>
+        </div>
+        {% endif %}
+        {% if s.delivered_at %}
+        <div>
+          <p class="text-xs text-slate-400 uppercase">Entregado</p>
+          <p class="text-green-300">{{ s.delivered_at.strftime('%Y-%m-%d %H:%M') }}</p>
+        </div>
+        {% endif %}
+      </div>
+
+      {% if s.photos %}
+      <div>
+        <p class="text-xs text-slate-400 uppercase mb-2">Comprobantes</p>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-2">
+          {% for p in s.photos %}
+          <a href="{{ p.url }}" target="_blank">
+            <img src="{{ p.url }}" class="w-full h-28 object-cover rounded-lg border border-slate-700 hover:border-yellow-400 transition" alt="comprobante">
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+    </div>
+
+    <p class="text-center text-xs text-slate-500 mt-6">
+      Hecorp · Seguimiento publico · Si detectas algo irregular contacta a tu remitente.
+    </p>
+  </div>
+</body>
+</html>

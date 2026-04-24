@@ -1,12 +1,22 @@
+# ENV
 .env
-users.db
 
+# DATABASES
+*.db
+*.sqlite3
+
+# PYTHON
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
+*$py.class
 
+# LOGS
 logs/
 *.log
 
-*.sqlite3
+# VENV
+venv/
+.env/
+
+# SYSTEM
+.DS_Store

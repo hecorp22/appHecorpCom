@@ -3,7 +3,7 @@ from fastapi.templating import Jinja2Templates
 
 from app.routers.auth_router import get_current_user_from_cookie
 from app.models.user_model import User
-from app.settings import settings
+from app.core.config import settings
 
 templates = Jinja2Templates(directory="app/templates")
 router = APIRouter()

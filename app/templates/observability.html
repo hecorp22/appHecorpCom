@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+{% block title %}Observabilidad{% endblock %}
+{% block page_title %}Observabilidad: Logs y Métricas{% endblock %}
+
+{% block content %}
+<div class="grid xl:grid-cols-3 gap-4">
+  <div class="card-glass xl:col-span-2">
+    <div class="flex flex-wrap gap-2 items-end">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300 flex-1">Logs en vivo</p>
+      <div>
+        <label class="text-[10px] text-slate-400">N líneas</label>
+        <input id="f-n" class="input is-small" type="number" min="10" max="2000" value="200">
+      </div>
+      <div>
+        <label class="text-[10px] text-slate-400">Nivel</label>
+        <div class="select is-small"><select id="f-level">
+          <option value="">Todos</option>
+          <option>INFO</option><option>WARNING</option><option>ERROR</option><option>DEBUG</option>
+        </select></div>
+      </div>
+      <div>
+        <label class="text-[10px] text-slate-400">Método</label>
+        <div class="select is-small"><select id="f-method">
+          <option value="">Todos</option>
+          <option>GET</option><option>POST</option><option>PUT</option><option>DELETE</option><option>PATCH</option>
+        </select></div>
+      </div>
+      <div>
+        <label class="text-[10px] text-slate-400">Path contiene</label>
+        <input id="f-path" class="input is-small" type="text" placeholder="/clients">
+      </div>
+      <button id="btnRefresh" class="button is-small is-warning">Actualizar</button>
+      <label class="text-xs text-slate-300 flex items-center gap-1">
+        <input id="auto" type="checkbox"> Auto 5s
+      </label>
+    </div>
+
+    <div class="overflow-x-auto mt-3">
+      <table class="min-w-full text-xs">
+        <thead class="text-slate-400 uppercase text-[10px] tracking-wider">
+          <tr>
+            <th class="text-left py-1 pr-2">Hora</th>
+            <th class="text-left py-1 pr-2">Nivel</th>
+            <th class="text-left py-1 pr-2">Método</th>
+            <th class="text-left py-1 pr-2">Path</th>
+            <th class="text-left py-1 pr-2">Status</th>
+            <th class="text-left py-1 pr-2">ms</th>
+            <th class="text-left py-1 pr-2">Mensaje</th>
+          </tr>
+        </thead>
+        <tbody id="logTbody" class="divide-y divide-slate-800"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="card-glass">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Métricas</p>
+    <div id="metrics" class="mt-3 space-y-2 text-xs text-slate-300"></div>
+    <div class="mt-3">
+      <a href="/metrics" target="_blank" class="text-yellow-300 text-xs underline">Ver /metrics crudo (Prometheus)</a>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function(){
+  const tbody = document.getElementById('logTbody');
+  const m = document.getElementById('metrics');
+  let timer = null;
+
+  function levelColor(l){
+    return { ERROR:'text-red-400', WARNING:'text-yellow-300', INFO:'text-slate-200', DEBUG:'text-slate-500' }[l] || 'text-slate-300';
+  }
+  function statusColor(s){
+    if (!s) return '';
+    if (s>=500) return 'text-red-400';
+    if (s>=400) return 'text-yellow-300';
+    if (s>=300) return 'text-sky-300';
+    return 'text-green-400';
+  }
+
+  async function loadLogs(){
+    const n = document.getElementById('f-n').value;
+    const lv = document.getElementById('f-level').value;
+    const me = document.getElementById('f-method').value;
+    const pa = document.getElementById('f-path').value;
+    const q = new URLSearchParams({ n });
+    if (lv) q.append('level', lv);
+    if (me) q.append('method', me);
+    if (pa) q.append('path', pa);
+    const r = await fetch('/admin/logs.json?' + q.toString(), { credentials:'same-origin' });
+    if (!r.ok) return;
+    const { entries } = await r.json();
+    tbody.innerHTML = entries.map(e => `
+      <tr>
+        <td class="py-1 pr-2 whitespace-nowrap text-slate-400">${(e.time||'').slice(11,23)}</td>
+        <td class="py-1 pr-2 ${levelColor(e.level)}">${e.level||''}</td>
+        <td class="py-1 pr-2">${e.method||''}</td>
+        <td class="py-1 pr-2 font-mono">${e.path||''}</td>
+        <td class="py-1 pr-2 ${statusColor(e.status)}">${e.status||''}</td>
+        <td class="py-1 pr-2 text-slate-400">${e.duration_ms?Number(e.duration_ms).toFixed(1):''}</td>
+        <td class="py-1 pr-2 text-slate-300">${(e.message||'').slice(0,90)}${e.error?` · <span class="text-red-400">${e.error}</span>`:''}</td>
+      </tr>`).join('');
+  }
+
+  async function loadMetrics(){
+    const r = await fetch('/metrics', { credentials:'same-origin' });
+    if (!r.ok) return;
+    const txt = await r.text();
+    const wanted = {};
+    for (const line of txt.split('\n')){
+      if (!line || line.startsWith('#')) continue;
+      const match = line.match(/^(\w+)(\{[^}]*\})?\s+(.*)$/);
+      if (!match) continue;
+      const [ , name, labels, value ] = match;
+      if (['http_requests_total','http_request_duration_seconds_count','process_resident_memory_bytes','process_cpu_seconds_total','python_info'].includes(name)){
+        (wanted[name] ||= []).push({ labels: labels||'', value });
+      }
+    }
+    let html = '';
+    const mem = wanted.process_resident_memory_bytes?.[0];
+    if (mem) html += `<div>💾 Memoria: <b>${(parseFloat(mem.value)/1024/1024).toFixed(1)} MB</b></div>`;
+    const cpu = wanted.process_cpu_seconds_total?.[0];
+    if (cpu) html += `<div>⚙️ CPU total: <b>${parseFloat(cpu.value).toFixed(2)} s</b></div>`;
+    const reqs = wanted.http_requests_total || [];
+    if (reqs.length){
+      const total = reqs.reduce((a,b)=>a+parseFloat(b.value||0), 0);
+      html += `<div>🌐 Total requests: <b>${total.toFixed(0)}</b></div>`;
+      const byStatus = {};
+      reqs.forEach(r=>{
+        const mm = r.labels.match(/status=\"(\d+)\"/); if (!mm) return;
+        const s = mm[1]; byStatus[s] = (byStatus[s]||0) + parseFloat(r.value||0);
+      });
+      html += '<div class="pt-1 text-[11px] text-slate-400">Por status:</div>';
+      Object.entries(byStatus).sort().forEach(([s,v]) => {
+        html += `<div class="pl-2">${s}: ${v.toFixed(0)}</div>`;
+      });
+    }
+    m.innerHTML = html || '<div class="text-slate-500">Sin métricas aún.</div>';
+  }
+
+  function refresh(){ loadLogs(); loadMetrics(); }
+  document.getElementById('btnRefresh').addEventListener('click', refresh);
+  document.getElementById('auto').addEventListener('change', (e) => {
+    clearInterval(timer);
+    if (e.target.checked) timer = setInterval(refresh, 5000);
+  });
+  refresh();
+})();
+</script>
+{% endblock %}

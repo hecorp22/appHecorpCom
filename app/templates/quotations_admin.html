@@ -1,0 +1,268 @@
+{% extends "base.html" %}
+{% block title %}Cotizaciones{% endblock %}
+{% block page_title %}Cotizaciones{% endblock %}
+
+{% block content %}
+<div class="grid xl:grid-cols-3 gap-6">
+  <div class="card-glass xl:col-span-2">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Nueva cotización</p>
+
+    <form id="quoteForm" class="mt-4 space-y-3" novalidate>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="field">
+          <label class="label text-slate-300 text-xs">Empresa *</label>
+          <input class="input" name="company" required minlength="2" maxlength="160" placeholder="Ej. Industrias XYZ S.A.">
+        </div>
+        <div class="field">
+          <label class="label text-slate-300 text-xs">Encargado *</label>
+          <input class="input" name="contact_name" required minlength="2" maxlength="160" placeholder="Ej. Ing. María López">
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+        <div class="field">
+          <label class="label text-slate-300 text-xs">Correo *</label>
+          <input class="input" type="email" name="email" required maxlength="160" placeholder="contacto@empresa.com">
+        </div>
+        <div class="field">
+          <label class="label text-slate-300 text-xs">Teléfono</label>
+          <input class="input" type="tel" name="phone" maxlength="40" placeholder="Ej. 5512345678">
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label text-slate-300 text-xs">Asunto *</label>
+        <input class="input" name="subject" required minlength="2" maxlength="200" placeholder="Ej. Suministro de bujes de bronce">
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="field">
+          <label class="label text-slate-300 text-xs">Moneda</label>
+          <div class="select w-full"><select name="currency" class="w-full">
+            <option>MXN</option><option>USD</option><option>EUR</option>
+          </select></div>
+        </div>
+        <div class="field">
+          <label class="label text-slate-300 text-xs">IVA</label>
+          <input class="input" type="number" step="0.01" min="0" max="1" name="iva_rate" value="0.16">
+        </div>
+        <div class="field">
+          <label class="label text-slate-300 text-xs">Vigencia hasta</label>
+          <input class="input" type="date" name="valid_until">
+        </div>
+      </div>
+
+      <div class="bg-slate-800/50 rounded-xl p-3 mt-2">
+        <div class="flex justify-between items-center mb-2">
+          <p class="text-xs uppercase tracking-wider text-yellow-300">Conceptos</p>
+          <button type="button" id="addItem" class="button is-small is-warning">+ Concepto</button>
+        </div>
+        <div id="items" class="space-y-2"></div>
+        <div class="mt-3 text-right text-sm space-y-1">
+          <div>Subtotal: <span id="t-sub" class="text-yellow-300 font-semibold">$0.00</span></div>
+          <div>IVA: <span id="t-iva" class="text-yellow-300 font-semibold">$0.00</span></div>
+          <div class="text-lg">TOTAL: <span id="t-tot" class="text-green-400 font-bold">$0.00</span></div>
+        </div>
+      </div>
+
+      <div class="field">
+        <label class="label text-slate-300 text-xs">Notas</label>
+        <textarea class="textarea" name="notes" rows="2" placeholder="Condiciones especiales, tiempos de entrega, etc."></textarea>
+      </div>
+
+      <button type="submit" class="button is-link is-fullwidth">Guardar cotización</button>
+    </form>
+    <div id="qMsg" class="mt-3 text-xs"></div>
+  </div>
+
+  <div class="card-glass">
+    <div class="flex justify-between items-center">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Existentes</p>
+      <input id="q-search" class="input is-small w-32" placeholder="Buscar...">
+    </div>
+    <div id="qList" class="mt-3 space-y-2 text-sm text-slate-300"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function(){
+  const form = document.getElementById('quoteForm');
+  const items = document.getElementById('items');
+  const msg = document.getElementById('qMsg');
+  const list = document.getElementById('qList');
+  const search = document.getElementById('q-search');
+  let searchTimer = null;
+
+  function money(n){ return '$' + (Number(n)||0).toFixed(2); }
+  function setMsg(t, ok){ msg.textContent = t; msg.style.color = ok?'#4ade80':'#f87171'; }
+
+  function newRow(){
+    const idx = items.children.length;
+    const row = document.createElement('div');
+    row.className = 'grid grid-cols-12 gap-2 items-end bg-slate-900/50 p-2 rounded';
+    row.innerHTML = `
+      <div class="col-span-4">
+        <label class="text-[10px] text-slate-400">Producto *</label>
+        <input class="input is-small it-prod" placeholder="Ej. Buje de bronce 3/4" required maxlength="160">
+      </div>
+      <div class="col-span-3">
+        <label class="text-[10px] text-slate-400">Pieza / No. parte</label>
+        <input class="input is-small it-piece" placeholder="Ej. BB-075" maxlength="120">
+      </div>
+      <div class="col-span-1">
+        <label class="text-[10px] text-slate-400">Cant.</label>
+        <input class="input is-small it-qty" type="number" step="0.001" min="0.001" value="1" required>
+      </div>
+      <div class="col-span-2">
+        <label class="text-[10px] text-slate-400">Modo</label>
+        <div class="select is-small w-full"><select class="w-full it-mode">
+          <option value="pieza">por pieza</option>
+          <option value="kg">por kg</option>
+        </select></div>
+      </div>
+      <div class="col-span-2">
+        <label class="text-[10px] text-slate-400">Precio unit.</label>
+        <input class="input is-small it-price" type="number" step="0.0001" min="0" value="0" required>
+      </div>
+
+      <div class="col-span-3 it-weight-wrap hidden">
+        <label class="text-[10px] text-slate-400">Peso (kg)</label>
+        <input class="input is-small it-weight" type="number" step="0.001" min="0" placeholder="0.500">
+      </div>
+      <div class="col-span-8">
+        <label class="text-[10px] text-slate-400">Notas</label>
+        <input class="input is-small it-notes" placeholder="Especificaciones, acabado…" maxlength="255">
+      </div>
+      <div class="col-span-1 text-right">
+        <div class="text-[10px] text-slate-400">Importe</div>
+        <div class="it-total text-green-400 font-semibold text-sm">$0.00</div>
+      </div>
+      <div class="col-span-12 flex justify-end">
+        <button type="button" class="rm-item text-red-400 text-xs hover:text-red-300">× Quitar</button>
+      </div>
+    `;
+    row.querySelector('.rm-item').addEventListener('click', () => { row.remove(); recalc(); });
+    row.querySelector('.it-mode').addEventListener('change', (e) => {
+      row.querySelector('.it-weight-wrap').classList.toggle('hidden', e.target.value !== 'kg');
+      recalc();
+    });
+    ['.it-qty','.it-price','.it-weight'].forEach(sel => {
+      row.querySelector(sel).addEventListener('input', recalc);
+    });
+    items.appendChild(row);
+    recalc();
+  }
+
+  function recalc(){
+    let sub = 0;
+    [...items.children].forEach(row => {
+      const qty = parseFloat(row.querySelector('.it-qty').value) || 0;
+      const price = parseFloat(row.querySelector('.it-price').value) || 0;
+      const mode = row.querySelector('.it-mode').value;
+      const weight = parseFloat(row.querySelector('.it-weight').value) || 0;
+      const total = (mode === 'kg') ? (qty * weight * price) : (qty * price);
+      row.querySelector('.it-total').textContent = money(total);
+      sub += total;
+    });
+    const ivaRate = parseFloat(form.iva_rate.value) || 0;
+    const iva = sub * ivaRate;
+    document.getElementById('t-sub').textContent = money(sub);
+    document.getElementById('t-iva').textContent = money(iva);
+    document.getElementById('t-tot').textContent = money(sub + iva);
+  }
+  form.iva_rate.addEventListener('input', recalc);
+
+  document.getElementById('addItem').addEventListener('click', newRow);
+  newRow();
+
+  async function loadList(){
+    const q = search.value.trim();
+    const r = await fetch('/quotations/' + (q?`?q=${encodeURIComponent(q)}`:''), { credentials:'same-origin' });
+    if (!r.ok) return;
+    const d = await r.json();
+    list.innerHTML = d.length ? d.map(q => `
+      <div class="p-3 bg-slate-800/50 rounded-lg">
+        <div class="flex justify-between items-start gap-2">
+          <div>
+            <p class="font-semibold">${q.quote_code} <span class="text-slate-400 text-xs">· ${q.company}</span></p>
+            <p class="text-xs text-slate-400">${q.subject}</p>
+            <p class="text-[11px] text-slate-500">${q.contact_name} · ${q.email}</p>
+          </div>
+          <span class="text-[10px] px-2 py-0.5 bg-slate-700 rounded uppercase">${q.status}</span>
+        </div>
+        <div class="mt-2 text-xs">
+          Subtotal ${money(q.subtotal)} · IVA ${money(q.iva_amount)} ·
+          <b class="text-green-400">${money(q.total)} ${q.currency}</b>
+        </div>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <a href="/quotations/${q.id}/pdf" target="_blank" class="button is-small is-warning">⬇ PDF</a>
+          <button data-id="${q.id}" data-s="enviada"   class="btn-s button is-small is-link">Marcar enviada</button>
+          <button data-id="${q.id}" data-s="aceptada"  class="btn-s button is-small is-success">Aceptada</button>
+          <button data-id="${q.id}" data-s="rechazada" class="btn-s button is-small is-danger">Rechazada</button>
+          <button data-id="${q.id}" class="btn-del text-red-400 text-xs ml-auto">Eliminar</button>
+        </div>
+      </div>`).join('') : '<div class="text-slate-500 text-xs">Sin cotizaciones.</div>';
+
+    list.querySelectorAll('.btn-s').forEach(b => b.addEventListener('click', async () => {
+      const fd = new FormData(); fd.append('status', b.dataset.s);
+      await fetch(`/quotations/${b.dataset.id}/status`, { method:'PATCH', credentials:'same-origin', body: fd });
+      loadList();
+    }));
+    list.querySelectorAll('.btn-del').forEach(b => b.addEventListener('click', async () => {
+      if (!confirm('¿Eliminar cotización?')) return;
+      await fetch(`/quotations/${b.dataset.id}`, { method:'DELETE', credentials:'same-origin' });
+      loadList();
+    }));
+  }
+  search.addEventListener('input', () => { clearTimeout(searchTimer); searchTimer = setTimeout(loadList, 250); });
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (!form.checkValidity()){ form.reportValidity(); return; }
+
+    const payload = Object.fromEntries(new FormData(form).entries());
+    payload.iva_rate = parseFloat(payload.iva_rate) || 0;
+    if (payload.valid_until) payload.valid_until = new Date(payload.valid_until).toISOString();
+    else delete payload.valid_until;
+
+    payload.items = [...items.children].map(row => ({
+      product: row.querySelector('.it-prod').value.trim(),
+      piece: row.querySelector('.it-piece').value.trim() || null,
+      quantity: parseFloat(row.querySelector('.it-qty').value) || 0,
+      price_mode: row.querySelector('.it-mode').value,
+      unit_price: parseFloat(row.querySelector('.it-price').value) || 0,
+      weight_kg: parseFloat(row.querySelector('.it-weight').value) || null,
+      notes: row.querySelector('.it-notes').value.trim() || null,
+    }));
+    if (!payload.items.length){ setMsg('Agrega al menos un concepto', false); return; }
+
+    setMsg('Guardando...', true);
+    try{
+      const r = await fetch('/quotations/', {
+        method:'POST', credentials:'same-origin',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify(payload)
+      });
+      const b = await r.json().catch(()=>({}));
+      if (!r.ok){
+        let m = b.detail || 'Error';
+        if (Array.isArray(b.detail)) m = b.detail.map(d=>`${d.loc.slice(-1)[0]}: ${d.msg}`).join(' · ');
+        throw new Error(m);
+      }
+      setMsg(`Cotización ${b.quote_code} creada ✓`, true);
+      form.reset();
+      form.iva_rate.value = '0.16';
+      items.innerHTML = ''; newRow();
+      loadList();
+      // abre pdf automáticamente
+      window.open(`/quotations/${b.id}/pdf`, '_blank');
+    } catch(err){ setMsg('Error: '+err.message, false); }
+  });
+
+  loadList();
+})();
+</script>
+{% endblock %}

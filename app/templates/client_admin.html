@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Clientes{% endblock %}
+{% block page_title %}Administración de Clientes{% endblock %}
+
+{% block content %}
+<div class="grid lg:grid-cols-2 gap-6">
+  <div class="card-glass">
+    <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Agregar Cliente</p>
+    <form id="clientForm" class="mt-4 space-y-3" novalidate>
+
+      <div class="field">
+        <label class="label text-slate-300 text-xs" for="cl-name">Nombre *</label>
+        <input id="cl-name" class="input" type="text" name="name"
+               placeholder="Ej. Acme S.A. de C.V."
+               required minlength="2" maxlength="120"
+               autocomplete="organization"
+               title="Mínimo 2 caracteres">
+        <p class="help text-xs text-slate-500 hidden" data-error="name"></p>
+      </div>
+
+      <div class="field">
+        <label class="label text-slate-300 text-xs" for="cl-phone">Teléfono *</label>
+        <input id="cl-phone" class="input" type="tel" name="phone"
+               placeholder="Ej. 5512345678"
+               required pattern="\d{10}" maxlength="10" minlength="10"
+               inputmode="numeric" autocomplete="tel"
+               title="Exactamente 10 dígitos, sin espacios ni guiones">
+        <p class="help text-xs text-slate-500 hidden" data-error="phone"></p>
+      </div>
+
+      <div class="field">
+        <label class="label text-slate-300 text-xs" for="cl-account">Clave de cuenta *</label>
+        <input id="cl-account" class="input" type="text" name="account_key"
+               placeholder="Ej. CLI-0001"
+               required minlength="2" maxlength="50"
+               autocomplete="off">
+        <p class="help text-xs text-slate-500 hidden" data-error="account_key"></p>
+      </div>
+
+      <div class="field">
+        <label class="label text-slate-300 text-xs" for="cl-address">Dirección *</label>
+        <input id="cl-address" class="input" type="text" name="address"
+               placeholder="Ej. Av. Reforma 123"
+               required minlength="3" maxlength="255"
+               autocomplete="street-address">
+        <p class="help text-xs text-slate-500 hidden" data-error="address"></p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="cl-city">Ciudad *</label>
+          <input id="cl-city" class="input" type="text" name="city"
+                 placeholder="Ej. CDMX"
+                 required minlength="2" maxlength="80"
+                 autocomplete="address-level2">
+        </div>
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="cl-state">Estado *</label>
+          <input id="cl-state" class="input" type="text" name="state"
+                 placeholder="Ej. CDMX"
+                 required minlength="2" maxlength="80"
+                 autocomplete="address-level1">
+        </div>
+        <div class="field">
+          <label class="label text-slate-300 text-xs" for="cl-country">País *</label>
+          <input id="cl-country" class="input" type="text" name="country"
+                 value="México"
+                 placeholder="Ej. México"
+                 required minlength="2" maxlength="80"
+                 autocomplete="country-name">
+        </div>
+      </div>
+
+      <button type="submit" class="button is-link is-fullwidth" id="addClient">Agregar Cliente</button>
+    </form>
+    <div id="clientResponse" class="mt-4 text-xs"></div>
+  </div>
+
+  <div class="card-glass">
+    <div class="flex justify-between items-center">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Clientes Existentes</p>
+      <input id="cl-search" class="input is-small w-40" placeholder="Buscar...">
+    </div>
+    <ul id="clientList" class="mt-4 space-y-2 text-sm text-slate-300"></ul>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+(function(){
+  const form = document.getElementById('clientForm');
+  const out  = document.getElementById('clientResponse');
+  const list = document.getElementById('clientList');
+
+  function setMsg(text, ok){
+    out.textContent = text;
+    out.style.color = ok ? '#4ade80' : '#f87171';
+  }
+
+  form.addEventListener('submit', async (ev) => {
+    ev.preventDefault();
+    if (!form.checkValidity()){
+      form.reportValidity();
+      setMsg('Revisa los campos resaltados.', false);
+      return;
+    }
+    const payload = Object.fromEntries(new FormData(form).entries());
+    setMsg('Enviando...', true);
+    try{
+      const res = await fetch('/clients/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify(payload)
+      });
+      const body = await res.json().catch(()=>({}));
+      if (!res.ok){
+        let msg = body.detail || 'Error al guardar';
+        if (Array.isArray(body.detail)){
+          msg = body.detail.map(d => `${d.loc.slice(-1)[0]}: ${d.msg}`).join(' · ');
+        }
+        throw new Error(msg);
+      }
+      setMsg('Cliente agregado ✓', true);
+      form.reset();
+      fetchClients();
+    } catch(err){
+      setMsg('Error: ' + err.message, false);
+    }
+  });
+
+  const searchInp = document.getElementById('cl-search');
+  let searchTimer = null;
+
+  async function fetchClients(){
+    try{
+      const q = (searchInp && searchInp.value || '').trim();
+      const url = '/clients/' + (q ? `?q=${encodeURIComponent(q)}` : '');
+      const res = await fetch(url, { credentials:'same-origin' });
+      if (!res.ok) return;
+      const clients = await res.json();
+      list.innerHTML = '';
+      if (!clients.length){
+        list.innerHTML = '<li class="text-slate-500">Sin resultados.</li>';
+        return;
+      }
+      clients.forEach(c => {
+        const li = document.createElement('li');
+        li.className = 'p-3 bg-slate-800/50 rounded-lg';
+        li.innerHTML = `<div class="flex justify-between items-center">
+          <div>
+            <p class="font-semibold">${c.name}</p>
+            <p class="text-xs text-slate-400">${c.phone} · ${c.city}, ${c.state}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] px-2 py-0.5 bg-slate-700 rounded">${c.account_key}</span>
+            <button data-id="${c.id}" class="btn-del text-red-400 text-xs hover:text-red-300">Eliminar</button>
+          </div>
+        </div>`;
+        list.appendChild(li);
+      });
+      list.querySelectorAll('.btn-del').forEach(b => {
+        b.addEventListener('click', async () => {
+          if (!confirm('¿Eliminar cliente?')) return;
+          const r = await fetch(`/clients/${b.dataset.id}`, { method:'DELETE', credentials:'same-origin' });
+          if (!r.ok){ alert('Error eliminando'); return; }
+          fetchClients();
+        });
+      });
+    } catch(e){ console.error(e); }
+  }
+
+  if (searchInp){
+    searchInp.addEventListener('input', () => {
+      clearTimeout(searchTimer);
+      searchTimer = setTimeout(fetchClients, 250);
+    });
+  }
+  fetchClients();
+})();
+</script>
+{% endblock %}

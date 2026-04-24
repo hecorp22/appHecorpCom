@@ -5,7 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>{% block title %}HECORP Control{% endblock %}</title>
 
-  <link rel="icon" href="/static/favicon.png">
+  <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+  <link rel="alternate icon" href="/favicon.ico">
   <!-- Bulma + Tailwind CDN -->
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.4/css/bulma.min.css">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -23,77 +24,127 @@
     }
   </script>
   {% block extra_css %}{% endblock %}
+  <link rel="stylesheet" href="/static/css/custom.css">
+  <style>
+    /* Sidebar más sobrio */
+    .sidebar-link{
+      display:flex;align-items:center;gap:.6rem;
+      padding:.55rem .8rem;border-radius:.6rem;
+      color:#cbd5e1;font-size:.875rem;
+      transition:background-color .15s, color .15s;
+    }
+    .sidebar-link:hover{background:rgba(148,163,184,.12);color:#fde68a}
+    .sidebar-link.active{background:rgba(251,191,36,.12);color:#fde68a}
+    .icon-sm{width:18px;height:18px;flex-shrink:0}
+    /* Colapsable móvil */
+    @media (max-width: 1023px){
+      #hecorp-sidebar{display:none}
+      #hecorp-sidebar.open{display:block}
+    }
+  </style>
 </head>
 <body class="bg-slate-950 text-slate-100 min-h-screen">
   <div class="lg:flex">
+    <!-- Topbar móvil -->
+    <div class="lg:hidden flex items-center justify-between bg-slate-900 border-b border-slate-800 px-4 py-3 sticky top-0 z-20">
+      <div class="flex items-center gap-2">
+        <div class="w-8 h-8 rounded-full bg-gradient-to-br from-yellow-300 to-orange-500 flex items-center justify-center text-slate-900 font-bold text-sm">H</div>
+        <span class="font-semibold">HECORP</span>
+      </div>
+      <button id="sidebarToggle" class="text-slate-300 text-2xl leading-none px-2" aria-label="Menú">&#9776;</button>
+    </div>
+
     <!-- Sidebar -->
-    <aside class="lg:w-64 bg-slate-900 border-r border-slate-800 min-h-screen p-6 sticky top-0">
-      <div class="flex items-center gap-3 mb-8">
-        <div class="w-12 h-12 rounded-full bg-gradient-to-br from-yellow-300 to-orange-500 flex items-center justify-center text-slate-900 font-bold">H</div>
+    <aside id="hecorp-sidebar" class="lg:w-60 bg-slate-900 border-r border-slate-800 lg:min-h-screen p-5 lg:sticky lg:top-0">
+      <div class="hidden lg:flex items-center gap-3 mb-8">
+        <div class="w-10 h-10 rounded-full bg-gradient-to-br from-yellow-300 to-orange-500 flex items-center justify-center text-slate-900 font-bold">H</div>
         <div>
-          <p class="text-xs uppercase tracking-[0.5em] text-yellow-300">Centro</p>
-          <h1 class="text-xl font-semibold">HECORP</h1>
+          <p class="text-[10px] uppercase tracking-[0.4em] text-yellow-300">Centro</p>
+          <h1 class="text-lg font-semibold leading-tight">HECORP</h1>
         </div>
       </div>
 
       {% import "icons.html" as ic %}
-      <nav class="flex flex-col gap-2 text-sm">
+      <nav class="flex flex-col gap-1 text-sm">
         <a class="sidebar-link" href="/home">{{ ic.home()|safe }} Dashboard</a>
         {% if user %}
           <a class="sidebar-link" href="/agenda">{{ ic.agenda()|safe }} Agenda</a>
           <a class="sidebar-link" href="/bot">{{ ic.bot()|safe }} Bot</a>
           <a class="sidebar-link" href="/maps">{{ ic.map()|safe }} Mapa</a>
           <a class="sidebar-link" href="/rutas">{{ ic.rutas()|safe }} Rutas</a>
-          {% if user.role and user.role|lower == "superuser" %}
+          {% if user and user.role|lower == "superuser" %}
+            <p class="mt-4 mb-1 text-[10px] uppercase tracking-[0.3em] text-slate-500 px-2">Operación</p>
+            <a class="sidebar-link" href="/admin/dashboard">{{ ic.users()|safe }} Dashboard</a>
+            <a class="sidebar-link" href="/admin/quotations">{{ ic.agenda()|safe }} Cotizaciones</a>
+            <a class="sidebar-link" href="/admin/orders">{{ ic.agenda()|safe }} Pedidos</a>
+            <a class="sidebar-link" href="/admin/shipments">{{ ic.rutas()|safe }} Envíos</a>
+
+            <p class="mt-4 mb-1 text-[10px] uppercase tracking-[0.3em] text-slate-500 px-2">Administración</p>
             <a class="sidebar-link" href="/admin/users">{{ ic.users()|safe }} Usuarios</a>
+            <a class="sidebar-link" href="/admin/clients">{{ ic.clientes()|safe }} Clientes</a>
+            <a class="sidebar-link" href="/admin/providers">{{ ic.proveedores()|safe }} Proveedores</a>
+            <a class="sidebar-link" href="/admin/observability">{{ ic.logs()|safe }} Observabilidad</a>
           {% endif %}
         {% endif %}
       </nav>
+
       {% if user %}
-        <div class="mt-8 p-4 bg-slate-800/70 rounded-2xl">
-          <p class="text-xs text-slate-400 uppercase tracking-[0.3em]">Sesión activa</p>
-          <p class="text-lg font-semibold">{{ user.display_name or user.email }}</p>
-          <span class="inline-block mt-2 px-3 py-1 rounded-full text-xs bg-slate-700">Rol: {{ user.role }}</span>
+        <div class="mt-6 p-3 bg-slate-800/60 rounded-xl">
+          <p class="text-[10px] text-slate-400 uppercase tracking-[0.3em]">Sesión</p>
+          <p class="text-sm font-semibold truncate">{{ user.display_name or user.email }}</p>
+          <span class="inline-block mt-1 px-2 py-0.5 rounded-full text-[10px] bg-slate-700 uppercase tracking-wider">{{ user.role }}</span>
         </div>
       {% endif %}
     </aside>
 
     <!-- Main -->
     <div class="flex-1 flex flex-col min-h-screen">
-      <header class="bg-slate-900/70 border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+      <header class="hidden lg:flex bg-slate-900/70 border-b border-slate-800 px-6 py-4 items-center justify-between">
         <h2 class="text-2xl font-semibold">{% block page_title %}Panel{% endblock %}</h2>
         {% if user %}
           <div class="flex items-center gap-3">
             {% if user.avatar_url %}
-              <img src="{{ user.avatar_url }}" class="w-10 h-10 rounded-full object-cover" alt="avatar"/>
+              <img src="{{ user.avatar_url }}" class="w-9 h-9 rounded-full object-cover" alt="avatar"/>
             {% endif %}
-            <div>
-              <p class="text-sm text-slate-400">Bienvenido</p>
-              <p class="font-semibold">{{ user.display_name or user.email }}</p>
+            <div class="text-right">
+              <p class="text-xs text-slate-400">Bienvenido</p>
+              <p class="font-semibold text-sm">{{ user.display_name or user.email }}</p>
             </div>
             <a href="/logout" class="button is-small is-warning">Salir</a>
           </div>
         {% endif %}
       </header>
 
-      <main class="flex-1 p-6">
+      <main class="flex-1 p-4 lg:p-6">
         {% block content %}{% endblock %}
       </main>
 
-      <footer class="bg-slate-900 border-t border-slate-800 px-6 py-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-400">
-        <div>
-          <strong>HECORP</strong><br>
-          Centro Pokémon digital · "Usa lo mejor, comparte tu energía"
-        </div>
-        <div class="flex gap-4">
+      <footer class="bg-slate-900 border-t border-slate-800 px-6 py-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-400">
+        <div><strong>HECORP</strong> · CRM Operaciones</div>
+        <div class="flex gap-3">
           <a href="/privacy" class="hover:text-yellow-300">Privacidad</a>
           <a href="/terms" class="hover:text-yellow-300">Términos</a>
         </div>
-        <span>● Sistema activo</span>
+        <span>● Activo</span>
       </footer>
     </div>
   </div>
 
+  <script>
+    // Toggle sidebar móvil
+    (function(){
+      var btn = document.getElementById('sidebarToggle');
+      var sb  = document.getElementById('hecorp-sidebar');
+      if(btn && sb){
+        btn.addEventListener('click', function(){ sb.classList.toggle('open'); });
+      }
+      // Marcar enlace activo
+      var path = window.location.pathname;
+      document.querySelectorAll('.sidebar-link').forEach(function(a){
+        if(a.getAttribute('href') === path){ a.classList.add('active'); }
+      });
+    })();
+  </script>
   {% block scripts %}{% endblock %}
 </body>
 </html>

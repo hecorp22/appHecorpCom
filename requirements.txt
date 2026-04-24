@@ -19,6 +19,7 @@ email-validator==2.3.0
 python-dotenv==1.1.1
 requests==2.32.5
 pillow==11.3.0
+reportlab==4.2.5
 
 # --- Métricas y logs ---
 prometheus-client==0.23.1

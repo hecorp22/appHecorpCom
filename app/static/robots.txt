@@ -1,0 +1,13 @@
+User-agent: *
+Disallow: /admin/
+Disallow: /quotations/
+Disallow: /orders/
+Disallow: /shipments/
+Disallow: /clients/
+Disallow: /providers/
+Disallow: /payroll/
+Disallow: /kpis
+Allow: /
+Allow: /login
+
+Sitemap: https://hecorp.com.mx/sitemap.xml
