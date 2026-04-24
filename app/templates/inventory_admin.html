@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+{% block title %}Inventario{% endblock %}
+{% block page_title %}Inventario · Almacén{% endblock %}
+{% block extra_css %}
+<style>
+  .kpi { background: linear-gradient(135deg, rgba(19,164,181,.18), rgba(10,110,122,.28));
+         border:1px solid rgba(19,164,181,.35); }
+  .kpi-amber { background: linear-gradient(135deg, rgba(185,139,58,.15), rgba(185,139,58,.35));
+               border:1px solid rgba(227,196,146,.45); }
+  .kpi-red { background: linear-gradient(135deg, rgba(239,68,68,.15), rgba(220,38,38,.35));
+             border:1px solid rgba(239,68,68,.45); }
+  .row-low { background: rgba(239,68,68,.12); }
+  table.inv th { font-size:11px; text-transform:uppercase; letter-spacing:.1em;
+                 color:#94a3b8; text-align:left; padding:6px 8px; border-bottom:1px solid #1e293b; }
+  table.inv td { padding:8px; border-bottom:1px solid #1e293b; font-size:13px; }
+</style>
+{% endblock %}
+{% block content %}
+
+<section class="grid grid-cols-2 md:grid-cols-4 gap-4">
+  <div class="kpi p-4 rounded-xl">
+    <p class="text-xs uppercase tracking-widest text-cyan-300">Productos activos</p>
+    <p class="text-3xl font-bold mt-1" id="k-prod">{{ kpi.total_products }}</p>
+  </div>
+  <div class="kpi p-4 rounded-xl">
+    <p class="text-xs uppercase tracking-widest text-cyan-300">Almacenes</p>
+    <p class="text-3xl font-bold mt-1" id="k-wh">{{ kpi.total_warehouses }}</p>
+  </div>
+  <div class="kpi-amber p-4 rounded-xl">
+    <p class="text-xs uppercase tracking-widest text-amber-200">Unidades totales</p>
+    <p class="text-3xl font-bold mt-1" id="k-units">{{ kpi.total_units }}</p>
+  </div>
+  <div class="kpi-red p-4 rounded-xl">
+    <p class="text-xs uppercase tracking-widest text-red-200">Bajo stock mínimo</p>
+    <p class="text-3xl font-bold mt-1" id="k-low">{{ kpi.low_count }}</p>
+  </div>
+</section>
+
+<section class="grid lg:grid-cols-3 gap-6 mt-6">
+  <aside class="space-y-4">
+
+    <div class="card-glass">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Nuevo producto</p>
+      <form id="frm-prod" class="mt-3 grid gap-2" onsubmit="return false;">
+        <div class="grid grid-cols-2 gap-2">
+          <input class="input" name="sku" placeholder="SKU" required>
+          <input class="input" name="unit" placeholder="pza/kg/caja" value="pza">
+        </div>
+        <input class="input" name="name" placeholder="Nombre" required>
+        <input class="input" name="category" placeholder="Categoría">
+        <div class="grid grid-cols-3 gap-2">
+          <input class="input" name="price" type="number" step="0.01" placeholder="Precio">
+          <input class="input" name="cost" type="number" step="0.01" placeholder="Costo">
+          <input class="input" name="stock_min" type="number" step="0.01" value="0" placeholder="Stock mín">
+        </div>
+        <button class="button is-warning">Guardar producto</button>
+      </form>
+    </div>
+
+    <div class="card-glass">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Nuevo almacén</p>
+      <form id="frm-wh" class="mt-3 grid gap-2" onsubmit="return false;">
+        <div class="grid grid-cols-2 gap-2">
+          <input class="input" name="code" placeholder="Código" required>
+          <select class="input" name="is_default">
+            <option value="0">No default</option><option value="1">Default</option>
+          </select>
+        </div>
+        <input class="input" name="name" placeholder="Nombre" required>
+        <input class="input" name="address" placeholder="Dirección">
+        <button class="button is-info">Guardar almacén</button>
+      </form>
+    </div>
+
+    <div class="card-glass">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Movimiento</p>
+      <form id="frm-mov" class="mt-3 grid gap-2" onsubmit="return false;">
+        <select class="input" name="product_id" id="sel-prod" required>
+          <option value="">— Producto —</option>
+        </select>
+        <select class="input" name="warehouse_id" id="sel-wh" required>
+          <option value="">— Almacén —</option>
+        </select>
+        <select class="input" name="kind" required>
+          <option value="entrada">Entrada (+)</option>
+          <option value="salida">Salida (−)</option>
+          <option value="ajuste">Ajuste (=)</option>
+        </select>
+        <input class="input" name="qty" type="number" step="0.001" placeholder="Cantidad" required>
+        <input class="input" name="reason" placeholder="Motivo (compra, merma, conteo...)">
+        <input class="input" name="reference" placeholder="Referencia">
+        <button class="button is-link">Registrar movimiento</button>
+      </form>
+    </div>
+
+    <div class="card-glass">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Transferencia entre almacenes</p>
+      <form id="frm-tr" class="mt-3 grid gap-2" onsubmit="return false;">
+        <select class="input" name="product_id" id="sel-prod-tr" required>
+          <option value="">— Producto —</option>
+        </select>
+        <div class="grid grid-cols-2 gap-2">
+          <select class="input" name="from_wh" id="sel-wh-from" required>
+            <option value="">— Origen —</option>
+          </select>
+          <select class="input" name="to_wh" id="sel-wh-to" required>
+            <option value="">— Destino —</option>
+          </select>
+        </div>
+        <input class="input" name="qty" type="number" step="0.001" placeholder="Cantidad" required>
+        <input class="input" name="reason" placeholder="Motivo">
+        <button class="button is-dark">Transferir</button>
+      </form>
+    </div>
+
+  </aside>
+
+  <div class="lg:col-span-2 space-y-4">
+
+    <div class="card-glass">
+      <div class="flex items-center justify-between mb-3">
+        <p class="text-xs uppercase tracking-[0.4em] text-yellow-300">Productos</p>
+        <div class="flex gap-2">
+          <input class="input" id="srch" placeholder="Buscar..." style="max-width:160px">
+          <button class="button is-small is-dark" id="filt-all">Todos</button>
+          <button class="button is-small is-danger" id="filt-low">Bajo mínimo</button>
+        </div>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="inv w-full">
+          <thead>
+            <tr><th>SKU</th><th>Nombre</th><th>Cat.</th><th>Unit</th><th>Precio</th><th>Total</th><th>Mín</th><th></th></tr>
+          </thead>
+          <tbody id="tbl-prod"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="card-glass">
+      <p class="text-xs uppercase tracking-[0.4em] text-yellow-300 mb-3">Movimientos recientes</p>
+      <div class="overflow-x-auto">
+        <table class="inv w-full">
+          <thead>
+            <tr><th>Fecha</th><th>Producto</th><th>Almacén</th><th>Tipo</th><th>Qty</th><th>Ref.</th><th>Motivo</th></tr>
+          </thead>
+          <tbody id="tbl-mov"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+{% endblock %}
+{% block scripts %}
+{{ super() }}
+<script>
+let lowOnly = false;
+let qFilter = '';
+
+async function api(method, url, body) {
+  const opt = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) opt.body = JSON.stringify(body);
+  const r = await fetch(url, opt);
+  if (!r.ok) {
+    const t = await r.text().catch(()=>'');
+    throw new Error(`HTTP ${r.status} · ${t.slice(0,200)}`);
+  }
+  return r.json().catch(()=> ({}));
+}
+
+function readForm(frm) {
+  const fd = new FormData(frm);
+  const o = {};
+  for (const [k, v] of fd.entries()) {
+    if (v === '' || v === null) continue;
+    if (['price','cost','stock_min','qty'].includes(k)) o[k] = parseFloat(v);
+    else if (['product_id','warehouse_id','from_wh','to_wh','is_default'].includes(k)) o[k] = parseInt(v);
+    else o[k] = v;
+  }
+  return o;
+}
+
+async function loadKpi() {
+  const k = await api('GET', '/api/inventory/kpi');
+  document.getElementById('k-prod').textContent = k.total_products;
+  document.getElementById('k-wh').textContent = k.total_warehouses;
+  document.getElementById('k-units').textContent = k.total_units;
+  document.getElementById('k-low').textContent = k.low_count;
+}
+
+async function loadSelects() {
+  const [prods, whs] = await Promise.all([
+    api('GET', '/api/inventory/products?active=1'),
+    api('GET', '/api/inventory/warehouses?active=1'),
+  ]);
+  const fill = (id, items, fmt) => {
+    const sel = document.getElementById(id);
+    if (!sel) return;
+    const keep = sel.value;
+    const base = sel.querySelector('option');
+    sel.innerHTML = '';
+    sel.appendChild(base);
+    items.forEach(it => {
+      const o = document.createElement('option');
+      o.value = it.id; o.textContent = fmt(it);
+      sel.appendChild(o);
+    });
+    sel.value = keep;
+  };
+  ['sel-prod','sel-prod-tr'].forEach(id => fill(id, prods, p => `${p.sku} · ${p.name}`));
+  ['sel-wh','sel-wh-from','sel-wh-to'].forEach(id => fill(id, whs, w => `${w.code} · ${w.name}`));
+}
+
+async function loadProducts() {
+  let url = '/api/inventory/products';
+  const params = [];
+  if (lowOnly) params.push('low_only=true');
+  if (qFilter) params.push('q=' + encodeURIComponent(qFilter));
+  if (params.length) url += '?' + params.join('&');
+  const items = await api('GET', url);
+  const tb = document.getElementById('tbl-prod');
+  tb.innerHTML = '';
+  if (!items.length) {
+    tb.innerHTML = '<tr><td colspan="8" class="text-slate-500 text-xs">Sin productos.</td></tr>';
+    return;
+  }
+  items.forEach(p => {
+    const tr = document.createElement('tr');
+    if (p.low_stock) tr.className = 'row-low';
+    tr.innerHTML = `
+      <td class="font-mono">${p.sku}</td>
+      <td>${p.name}</td>
+      <td class="text-slate-400">${p.category || '—'}</td>
+      <td>${p.unit}</td>
+      <td>${p.price ?? '—'}</td>
+      <td class="font-bold">${p.total_qty}</td>
+      <td class="text-slate-400">${p.stock_min}</td>
+      <td><button class="text-red-400 text-xs" data-del="${p.id}">eliminar</button></td>`;
+    tr.querySelector('[data-del]').addEventListener('click', async () => {
+      if (!confirm(`Eliminar ${p.sku}?`)) return;
+      try { await api('DELETE', `/api/inventory/products/${p.id}`); loadAll(); } catch(e){ alert(e.message); }
+    });
+    tb.appendChild(tr);
+  });
+}
+
+async function loadMovements() {
+  const items = await api('GET', '/api/inventory/movements?limit=50');
+  const tb = document.getElementById('tbl-mov');
+  tb.innerHTML = '';
+  if (!items.length) {
+    tb.innerHTML = '<tr><td colspan="7" class="text-slate-500 text-xs">Sin movimientos.</td></tr>';
+    return;
+  }
+  items.forEach(m => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="text-slate-400">${(m.ts||'').replace('T',' ').slice(0,16)}</td>
+      <td>${m.product?.sku || m.product_id} · ${m.product?.name || ''}</td>
+      <td>${m.warehouse?.code || m.warehouse_id}</td>
+      <td>${m.kind}</td>
+      <td>${m.qty}</td>
+      <td class="text-slate-400">${m.reference || '—'}</td>
+      <td class="text-slate-400">${m.reason || '—'}</td>`;
+    tb.appendChild(tr);
+  });
+}
+
+async function loadAll() {
+  await loadKpi();
+  await loadSelects();
+  await loadProducts();
+  await loadMovements();
+}
+
+document.getElementById('frm-prod').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('POST', '/api/inventory/products', readForm(e.target)); e.target.reset(); loadAll(); }
+  catch(err){ alert(err.message); }
+});
+document.getElementById('frm-wh').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('POST', '/api/inventory/warehouses', readForm(e.target)); e.target.reset(); loadAll(); }
+  catch(err){ alert(err.message); }
+});
+document.getElementById('frm-mov').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('POST', '/api/inventory/movements', readForm(e.target)); e.target.reset(); loadAll(); }
+  catch(err){ alert(err.message); }
+});
+document.getElementById('frm-tr').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  try { await api('POST', '/api/inventory/transfer', readForm(e.target)); e.target.reset(); loadAll(); }
+  catch(err){ alert(err.message); }
+});
+
+document.getElementById('filt-all').addEventListener('click', () => { lowOnly = false; loadProducts(); });
+document.getElementById('filt-low').addEventListener('click', () => { lowOnly = true; loadProducts(); });
+document.getElementById('srch').addEventListener('input', (e) => {
+  qFilter = e.target.value;
+  clearTimeout(window._qt);
+  window._qt = setTimeout(loadProducts, 250);
+});
+
+loadAll();
+setInterval(loadKpi, 60000);
+</script>
+{% endblock %}

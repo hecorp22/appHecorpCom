@@ -307,6 +307,12 @@ def change_delivery_status(db: Session, did: int, status: str,
         d.delivered_at = now
         if not d.arrived_at:
             d.arrived_at = now
+        # Descontar stock de productos vinculados (idempotente por d.code)
+        try:
+            from app.services import inventory_service as inv
+            inv.consume_delivery_stock(db, d)
+        except Exception:
+            pass
     if message is not None:
         d.delivery_message = message
     if report is not None:
@@ -613,11 +619,21 @@ def run_alerts(db: Session) -> Dict[str, Any]:
                 "status": d.status,
             })
 
+    # 3) reorden de inventario
+    low_count = 0
+    try:
+        from app.services import inventory_service as inv
+        low = inv.check_low_stock(db)
+        low_count = low.get("low_count", 0)
+    except Exception:
+        pass
+
     return {
         "checked_at": now.isoformat(),
         "runs_active": len(runs_active),
         "alerts_gps": len(alerts["gps_stale"]),
         "alerts_late": len(alerts["late"]),
+        "alerts_low_stock": low_count,
         "detail": alerts,
     }
 

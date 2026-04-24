@@ -34,6 +34,7 @@ from app.models import provider_account as _m_pa  # noqa: F401
 from app.models import order as _m_order           # noqa: F401
 from app.models import shipment as _m_shipment     # noqa: F401
 from app.models import delivery as _m_delivery     # noqa: F401
+from app.models import inventory as _m_inventory   # noqa: F401
 
 # NUEVO: logs + métricas
 from app.core.logging_conf import setup_logging
@@ -151,6 +152,10 @@ app.include_router(rutas_router.api)
 from app.routers import delivery_router  # noqa: E402
 app.include_router(delivery_router.html)
 app.include_router(delivery_router.api)
+# Módulo Inventario
+from app.routers import inventory_router  # noqa: E402
+app.include_router(inventory_router.html)
+app.include_router(inventory_router.api)
 app.include_router(cfdi_router.router)
 app.include_router(telegram_webhook.router)
 app.include_router(face_router.router)
