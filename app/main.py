@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Request, Depends
+import os
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse, FileResponse, PlainTextResponse, Response
 from fastapi.templating import Jinja2Templates
@@ -69,13 +70,18 @@ app = FastAPI(
     openapi_url=None
 )
 
-# CORS (usas cookies → allow_credentials=True)
+# CORS (usas cookies → allow_credentials=True). NUNCA "*" cuando hay cookies.
+_default_origins = [
+    "https://hecorp.com.mx", "https://www.hecorp.com.mx",
+    "http://localhost:8000", "http://127.0.0.1:8000",
+]
+_extra = [o.strip() for o in (os.getenv("CORS_EXTRA_ORIGINS") or "").split(",") if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_default_origins + _extra,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-CSRF-Token"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "X-Requested-With", "X-CSRF-Token", "X-Cron-Token"],
     expose_headers=["X-Trace-Id"],
 )
 
@@ -83,6 +89,12 @@ app.add_middleware(
 logger = setup_logging()
 
 # Middlewares
+from app.core.security_middleware import (  # noqa: E402
+    SecurityHeadersMiddleware, RateLimitMiddleware, SecurityMonitorMiddleware,
+)
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(SecurityMonitorMiddleware)
 app.add_middleware(RequestContextMiddleware)
 app.add_middleware(CustomLatencyMiddleware)
 
@@ -161,6 +173,10 @@ app.include_router(inventory_router.api)
 from app.routers import billing_router  # noqa: E402
 app.include_router(billing_router.html)
 app.include_router(billing_router.api)
+# Panel de seguridad
+from app.routers import security_router  # noqa: E402
+app.include_router(security_router.html)
+app.include_router(security_router.api)
 app.include_router(cfdi_router.router)
 app.include_router(telegram_webhook.router)
 app.include_router(face_router.router)
